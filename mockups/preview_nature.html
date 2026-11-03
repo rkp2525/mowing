@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#7acc52">
+<canvas id="c" style="width:1200px;height:900px"></canvas>
+<script src="../js/sprites_nature.js"></script>
+<script>
+const S=MOW.SpritesNature,cv=document.getElementById('c'),D=2;cv.width=1200*D;cv.height=900*D;
+const g=cv.getContext('2d');g.scale(D,D);
+for(let y=0;y<900;y+=48){g.fillStyle=(y/48)%2?'#86d758':'#6ec148';g.fillRect(0,y,1200,48);}
+S.tree(g,110,230,{size:1,seed:0});S.tree(g,380,260,{size:2,seed:0});
+S.rock(g,560,200,{seed:0});S.rock(g,640,215,{seed:1});
+for(let k=0;k<4;k++)for(let v=0;v<3;v++)S.flower(g,700+k*60,130+v*70,{kind:k,v});
+S.gnome(g,960,80,{found:false});S.gnome(g,1020,80,{found:true});
+S.toy(g,1090,80,{kind:0});S.toy(g,1130,80,{kind:1});S.toy(g,1090,130,{kind:2});
+S.pondDecor(g,980,200,{kind:0});S.pondDecor(g,1060,200,{kind:1,seed:2});
+const L=[[0,0,0,0,0],[0,1,1,1,0],[0,1,1,1,0],[0,0,0,0,0]];
+g.save();g.setTransform(1,0,0,1,0,0);
+[[48,40,380],[96,330,380]].forEach(([P,ox,oy])=>{
+for(let j=0;j<4;j++)for(let i=0;i<5;i++){ if(!L[j][i])continue;
+ const land=(a,b)=>!(L[b]&&L[b][a]);
+ const m=(land(i,j-1)?1:0)|(land(i+1,j)?2:0)|(land(i,j+1)?4:0)|(land(i-1,j)?8:0);
+ g.save();g.translate((ox+i*P)*D,(oy+j*P)*D);S.waterTile(g,P*D,{mask:m,v:(i*3+j)&3});g.restore();}});
+g.restore();
+</script>

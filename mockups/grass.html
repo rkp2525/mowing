@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lawn Kid — grass style mockups</title>
+<style>
+  body{margin:0;background:#1f3a29;color:#fff6dc;font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif;padding:24px}
+  h1{margin:0 0 4px;font-size:26px} p.sub{margin:0 0 20px;opacity:.8}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:22px}
+  .card{background:#2a4a35;border-radius:16px;padding:14px;box-shadow:0 6px 0 rgba(0,0,0,.25)}
+  .card h2{margin:0 0 2px;font-size:20px} .card p{margin:4px 0 10px;font-size:14px;opacity:.85;line-height:1.35}
+  canvas{display:block;width:100%;height:auto;border-radius:10px;image-rendering:pixelated}
+  canvas.smooth{image-rendering:auto}
+</style></head><body>
+<h1>Grass style mockups</h1>
+<p class="sub">Same lawn in each: thick grass (top-left), normal tall grass, fresh stripes, a half-mown patch, a rock and flowers.</p>
+<div class="grid" id="g"></div>
+<script>
+const W=24,H=15;
+function hash(x,y,s){let h=(x*374761393+y*668265263+(s||0)*982451653)|0;h=(h^(h>>>13))*1274126177|0;return((h^(h>>>16))>>>0)/4294967295}
+// scene: grass 0 cut, 1 tall, 2 thick ; dir 1=light stripe, 2=dark stripe
+const sc={g:[],d:[]};
+for(let y=0;y<H;y++){sc.g[y]=[];sc.d[y]=[];for(let x=0;x<W;x++){
+  let g=1; if(x<9&&y<7)g=2;
+  if(x>=9&&y<10) g=0;                     // mown stripes (rows alternate)
+  if(x>=9&&y>=10&&y<12&&x<17) g=0;        // a partially mown lane
+  if(x>=17&&y>=10) g=1;
+  if(x>=9&&y>=12) g=1;
+  if(x<9&&y>=7&&y<9)g=1;
+  sc.g[y][x]=g; sc.d[y][x]=(y%2)?2:1; }}
+// diagonal "freshly cut" pass through the tall area
+for(let i=0;i<9;i++){const x=1+i,y=9+((i/2)|0); if(sc.g[y]&&sc.g[y][x]===1){sc.g[y][x]=0;sc.d[y][x]=1;} if(sc.g[y+1]&&sc.g[y+1][x]===1){sc.g[y+1][x]=0;sc.d[y+1][x]=1;}}
+const rock={x:5.5,y:11.5}, flowers=[[14.5,12.5],[15.5,12.5],[14.5,13.5]];
+
+function mk(S,smooth,scale){const c=document.createElement('canvas');c.width=W*S*scale;c.height=H*S*scale;if(smooth)c.className='smooth';const x=c.getContext('2d');x.scale(scale,scale);x.imageSmoothingEnabled=false;return[c,x]}
+const px=(x,c,X,Y,w,h)=>{x.fillStyle=c;x.fillRect(X,Y,w||1,h||1)};
+
+/* ---------- A: crisp pixel, 16px cells, rich detail ---------- */
+function styleA(){
+  const S=16,[c,x]=mk(S,false,1);
+  for(let y=0;y<H;y++)for(let cx=0;cx<W;cx++){
+    const g=sc.g[y][cx],X=cx*S,Y=y*S,hv=hash(cx,y,1);
+    if(g===0){
+      const l=sc.d[y][cx]===1; px(x,l?'#8fe05f':'#74c84d',X,Y,S,S);
+      // fine mow texture: horizontal-ish fibres + dither
+      for(let k=0;k<26;k++){const hx=hash(cx,y,k)*S|0,hy=hash(cx,y,k+50)*S|0; px(x,k%3?(l?'#9bea6b':'#7fd256'):(l?'#7ccd52':'#65b844'),X+hx,Y+hy,k%4?1:2,1)}
+      if(hash(cx,y,9)>.7)px(x,'#c2f58f',X+(hash(cx,y,4)*13|0),Y+(hash(cx,y,5)*14|0),2,1);
+    }else{
+      const thick=g===2; px(x,thick?'#2a6a32':'#3a8a3c',X,Y,S,S);
+      const n=thick?22:15;
+      for(let k=0;k<n;k++){
+        const hx=hash(cx,y,k+100)*S|0,hy=(hash(cx,y,k+200)*(S-5)|0)+2,len=thick?5+(hash(cx,y,k+7)*3|0):4+(hash(cx,y,k+7)*2|0),lean=hash(cx,y,k+300)>.5?1:-1;
+        const shade=hash(cx,y,k+400);
+        const base=thick?'#1f5527':'#2c6e31',mid=thick?'#2f7d38':'#3f9443',tip=thick?'#5fb85a':'#6cc15e';
+        px(x,base,X+hx,Y+hy+len-1,1,1);px(x,mid,X+hx,Y+hy+1,1,len-2);px(x,shade>.5?tip:mid,X+hx+(len>4?lean:0),Y+hy,1,2);
+      }
+      if(thick&&hash(cx,y,70)>.9)px(x,'#f0e8a0',X+(hash(cx,y,71)*14|0)+1,Y+(hash(cx,y,72)*10|0)+2,2,2);
+    }
+  }
+  // soft cut-edge shadow: dark line where tall meets cut (tall is "taller")
+  for(let y=0;y<H;y++)for(let cx=0;cx<W;cx++){ if(sc.g[y][cx]===0&&y>0&&sc.g[y-1][cx]>0) px(x,'rgba(30,70,30,.35)',cx*S,y*S,S,2); }
+  prop(x,S,false);return c;
+}
+
+/* ---------- B: individual blades at native resolution (organic) ---------- */
+function styleB(){
+  const S=20,scale=2,[c,x]=mk(S,true,scale);
+  c.className='smooth';
+  // flat bases with soft stripe gradients
+  for(let y=0;y<H;y++)for(let cx=0;cx<W;cx++){
+    const g=sc.g[y][cx];
+    if(g===0){const l=sc.d[y][cx]===1;const gr=x.createLinearGradient(0,y*S,0,y*S+S);
+      gr.addColorStop(0,l?'#92e062':'#78cb50');gr.addColorStop(1,l?'#86d658':'#6dc047');x.fillStyle=gr;x.fillRect(cx*S,y*S,S+.5,S+.5)}
+    else {x.fillStyle=g===2?'#245f2c':'#2f7a35';x.fillRect(cx*S,y*S,S+.5,S+.5)}
+  }
+  // blades for tall/thick; drawn over cell borders so no grid shows
+  for(let y=0;y<H;y++)for(let cx=0;cx<W;cx++){
+    const g=sc.g[y][cx]; if(!g)continue;
+    const n=g===2?34:22;
+    for(let k=0;k<n;k++){
+      const bx=(cx+hash(cx,y,k))*S,by=(y+hash(cx,y,k+60))*S+4,hgt=(g===2?12:9)+hash(cx,y,k+9)*5,lean=(hash(cx,y,k+33)-.5)*7,w=1.1+hash(cx,y,k+5)*.7;
+      const t=hash(cx,y,k+13);
+      const gr=x.createLinearGradient(bx,by,bx+lean,by-hgt);
+      gr.addColorStop(0,g===2?'#1a4a22':'#256b2d');gr.addColorStop(.6,g===2?'#2f8239':'#3f9a45');gr.addColorStop(1,t>.5?(g===2?'#72c75f':'#7fd468'):(g===2?'#4aa84f':'#58b957'));
+      x.fillStyle=gr;x.beginPath();x.moveTo(bx-w,by);x.quadraticCurveTo(bx+lean*.2,by-hgt*.6,bx+lean,by-hgt);x.quadraticCurveTo(bx+lean*.5+w*.4,by-hgt*.5,bx+w,by);x.closePath();x.fill();
+    }
+  }
+  // clippings & fibre on cut grass
+  for(let y=0;y<H;y++)for(let cx=0;cx<W;cx++){ if(sc.g[y][cx])continue; const l=sc.d[y][cx]===1;
+    x.strokeStyle=l?'rgba(190,255,140,.28)':'rgba(40,110,40,.18)';x.lineWidth=.7;
+    for(let k=0;k<7;k++){const bx=(cx+hash(cx,y,k+500))*S,by=(y+hash(cx,y,k+600))*S;x.beginPath();x.moveTo(bx,by);x.lineTo(bx+3+hash(cx,y,k+7)*3,by+(hash(cx,y,k+9)-.5));x.stroke()}
+    if(hash(cx,y,3)>.6){x.fillStyle='#c8f59a';x.fillRect((cx+hash(cx,y,31))*S,(y+hash(cx,y,32))*S,2,1)}
+  }
+  // soft shadow where tall grass meets cut
+  for(let y=1;y<H;y++)for(let cx=0;cx<W;cx++){ if(sc.g[y][cx]===0&&sc.g[y-1][cx]>0){const gr=x.createLinearGradient(0,y*S,0,y*S+5);gr.addColorStop(0,'rgba(20,60,25,.4)');gr.addColorStop(1,'rgba(20,60,25,0)');x.fillStyle=gr;x.fillRect(cx*S,y*S,S,5)} }
+  prop(x,S,true);return c;
+}
+
+/* ---------- C: raised tufts — height you can see, lowered when mown ---------- */
+function styleC(){
+  const S=16,[c,x]=mk(S,false,1);
+  // ground / cut layer first
+  for(let y=0;y<H;y++)for(let cx=0;cx<W;cx++){
+    const g=sc.g[y][cx],X=cx*S,Y=y*S;
+    const l=sc.d[y][cx]===1;
+    if(g===0){px(x,l?'#8fe05f':'#76ca4e',X,Y,S,S);
+      for(let k=0;k<8;k++)px(x,k%2?'#9cec6c':'#68b845',X+(hash(cx,y,k)*S|0),Y+(hash(cx,y,k+9)*S|0),2,1);
+      px(x,l?'#a8f078':'#86d85a',X,Y,S,1)}
+    else px(x,'#2a6430',X,Y,S,S);
+  }
+  // raised tall/thick cells, painter's order (top→bottom) so lower rows overlap
+  for(let y=0;y<H;y++)for(let cx=0;cx<W;cx++){
+    const g=sc.g[y][cx]; if(!g)continue; const X=cx*S,h=g===2?7:4,Y=y*S-h;
+    const top=g===2?'#3f9a44':'#4ba94b',side=g===2?'#1f5527':'#2c7a35',hi=g===2?'#68c05c':'#7bd568';
+    // front face (south) visible if cell below is lower
+    const below=sc.g[y+1]?sc.g[y+1][cx]:0;
+    if(below<g)px(x,side,X,Y+S,S,h+ (below?0:0)); // front wall
+    px(x,top,X,Y,S,S);
+    // blade texture on top
+    for(let k=0;k<(g===2?16:11);k++){const bx=hash(cx,y,k+100)*S|0,by=hash(cx,y,k+200)*(S-3)|0;px(x,k%3?hi:'#2c7a35',X+bx,Y+by,1,g===2?3:2)}
+    // tufted fringe along top edge
+    for(let i=0;i<S;i+=2){ if(hash(cx,y,i+300)>.4) px(x,hi,X+i,Y-1,1,1+(hash(cx,y,i+310)>.6?1:0)) }
+    // right-edge darkening if neighbour lower
+    const right=sc.g[y][cx+1];if(right!==undefined&&right<g)px(x,side,X+S-1,Y,1,S);
+  }
+  prop(x,S,false);return c;
+}
+
+function prop(x,S,smooth){
+  // rock
+  const rx=rock.x*S,ry=rock.y*S;
+  x.fillStyle='rgba(0,0,0,.25)';x.beginPath();x.ellipse(rx+2,ry+S*.28,S*.34,S*.17,0,0,7);x.fill();
+  x.fillStyle='#868b95';x.fillRect(rx-S*.28,ry-S*.18,S*.56,S*.4);x.fillStyle='#aab0ba';x.fillRect(rx-S*.2,ry-S*.28,S*.4,S*.18);x.fillStyle='#c6cbd3';x.fillRect(rx-S*.2,ry-S*.28,S*.15,S*.08);x.fillStyle='#6a6f78';x.fillRect(rx-S*.28,ry+S*.1,S*.56,S*.12);
+  // flowers
+  const cols=[['#f06a8a','#ffd1dc'],['#f5c542','#fff1a8'],['#9b7bea','#d9ccff']];
+  flowers.forEach(([fx,fy],i)=>{const X=fx*S,Y=fy*S,cl=cols[i%3];x.fillStyle='#2d7a32';x.fillRect(X-S*.1,Y,S*.12,S*.3);x.fillStyle=cl[0];x.fillRect(X-S*.22,Y-S*.2,S*.44,S*.22);x.fillStyle=cl[1];x.fillRect(X-S*.08,Y-S*.2,S*.14,S*.1)});
+}
+
+const defs=[
+  ['A · Crisp Pixel','High-res pixel art (16px tiles, 4× the detail of today). Every blade is a hand-placed pixel stroke with dark base → light tip; fine fibre texture on mown grass; a soft shadow where cut meets uncut. Scaled by whole pixels only, so zero blur.',styleA],
+  ['B · Hand-Drawn Blades','Resolution-independent: thousands of tapered, curved blades drawn at native screen resolution (always razor sharp, even on retina). Blades overlap cell borders so the grid disappears; mown stripes get soft gradients and tiny clippings.',styleB],
+  ['C · Raised Tufts','Uncut grass is a visible 3D-ish block with a tufted top and dark front wall — you literally watch the lawn get lower as you mow. Strongest "RollerCoaster Tycoon" depth; makes thick vs. tall obvious at a glance.',styleC],
+];
+const g=document.getElementById('g');
+for(const [t,d,f] of defs){const card=document.createElement('div');card.className='card';card.innerHTML=`<h2>${t}</h2><p>${d}</p>`;card.appendChild(f());g.appendChild(card)}
+</script></body></html>

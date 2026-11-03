@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Lawn Kid · Art review</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#243d30;color:#ede5cc;font:14px 'Trebuchet MS',sans-serif}header{padding:20px 28px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #64745a}h1{margin:0;font-size:22px}p{margin:6px 0;color:#bac7ad;font-size:13px}label{display:flex;align-items:center;gap:8px}select,button{font:inherit;background:#e9e1c9;color:#354937;border:0;border-radius:6px;padding:8px}main{padding:20px 28px}canvas{display:block;width:100%;border-radius:10px;background:#244b31}#cast{margin-top:18px}a{color:#e4c89c}.note{margin:12px 0;line-height:1.5}
+</style></head><body>
+<header><div><h1>Lawn Kid / Summer afternoons</h1><p>Backyard lawns · faded cotton · weathered cedar · worn paving</p></div>
+<label>Lawn <select id="level"></select></label><label>Tool <select id="tool"></select></label><label>Art <select id="art"><option value="pixel">Fine Pixel</option><option value="realism">Textured Realism</option></select></label><label>Cut <input id="cut" type="range" min="0" max="100" value="35"></label><button id="motion">Pause motion</button><a href="../index.html">Play game ↗</a></header>
+<main><canvas id="scene"></canvas><p class="note">Live game renderer. The strip below checks every tool in eight directions, including walking, idle, swing, tired, and stalled poses.</p><canvas id="cast"></canvas></main>
+<script src="../js/data.js"></script><script src="../js/sim.js"></script><script src="../js/sprites_nature.js"></script><script src="../js/sprites_player.js"></script><script src="../js/sprites_build.js"></script><script src="../js/render.js"></script><script src="../js/art-styles.js"></script>
+<script>
+const M=MOW, scene=document.querySelector('#scene'), cast=document.querySelector('#cast'), level=document.querySelector('#level'), tool=document.querySelector('#tool'), cut=document.querySelector('#cut');
+M.LEVELS.forEach((l,i)=>level.add(new Option((i+1)+' · '+l.name,i)));M.TOOL_ORDER.forEach(t=>tool.add(new Option(M.TOOLS[t].name,t)));
+const query=new URLSearchParams(location.search);level.value=query.get('level')||'0';tool.value=query.get('tool')||'scythe';
+let state, paused=query.has('still'), time=1.4;
+const art=document.querySelector('#art');art.value=query.get('art')==='realism'?'realism':'pixel';
+art.onchange=async()=>{await M.ArtStyles.setStyle(art.value);if(paused)draw()};
+const casts=M.TOOL_ORDER.map(tool=>M.Sim.create(0,{upgrades:{}},tool));
+function rebuild(){state=M.Sim.create(+level.value,{upgrades:{}},tool.value); M.Render.bake(state); const threshold=+cut.value/100;for(let y=0;y<state.H;y++)for(let x=0;x<state.W;x++){const i=y*state.W+x;if(state.grass[i]&&y>state.H*(1-threshold)){state.grass[i]=0;state.dir[i]=x%6<3?1:2;}}}
+level.onchange=tool.onchange=cut.oninput=()=>{rebuild();if(paused)draw()};document.querySelector('#motion').textContent=paused?'Resume motion':'Pause motion';document.querySelector('#motion').onclick=()=>{paused=!paused;document.querySelector('#motion').textContent=paused?'Resume motion':'Pause motion'; if(!paused)draw()};
+function size(cv,w,h){cv.width=w*2;cv.height=h*2;cv.style.aspectRatio=w+'/'+h;}
+size(scene,1440,760);size(cast,1440,700);rebuild();
+if(query.has('smoke')){
+  try {
+    const cv=document.createElement('canvas');cv.width=800;cv.height=500;
+    let count=0;
+    for(let l=0;l<M.LEVELS.length;l++)for(const t of M.TOOL_ORDER){
+      const st=M.Sim.create(l,{upgrades:{}},t);M.Render.bake(st);
+      const u=Math.min(cv.width/(st.W*M.CELL),cv.height/(st.H*M.CELL));
+      M.Render.draw(cv.getContext('2d'),st,{x:0,y:0},cv.width,cv.height,u,1,{footprint:true});count++;
+    }
+    document.body.dataset.smoke='PASS: '+count+' lawn/tool scenes rendered'; const result=document.createElement('p'); result.textContent=document.body.dataset.smoke; document.querySelector('header').appendChild(result);
+  } catch(e){document.body.dataset.smoke='FAIL: '+e.stack;}
+}
+function draw(){if(!paused)time+=1/60;const u=Math.min(scene.width/(state.W*M.CELL),scene.height/(state.H*M.CELL));const cam={x:(state.W*M.CELL-scene.width/u)/2,y:(state.H*M.CELL-scene.height/u)/2};M.Render.draw(scene.getContext('2d'),state,cam,scene.width,scene.height,u,time,{footprint:false});
+const g=cast.getContext('2d');g.setTransform(2,0,0,2,0,0);g.fillStyle='#ddd9bb';g.fillRect(0,0,1440,700);
+M.TOOL_ORDER.forEach((t,row)=>{g.fillStyle='#4d624d';g.font='13px Trebuchet MS';g.fillText(M.TOOLS[t].name,18,26+row*170);for(let col=0;col<8;col++){g.save();g.translate(95+col*178,130+row*170);g.scale(6,6);const cs=casts[row];cs.p.x=0;cs.p.y=0;cs.p.heading=col*Math.PI/4;cs.p.step=time*3;cs.moving=col<6;cs.engine=true;cs.tired=col===6;cs.stall=col===7?1:0;cs.sw=t==='scythe'&&col===0?{a0:0,t:time%M.SCYTHE.duration}:null;M.ArtStyles.drawPlayer(g,cs,time);g.restore();}});if(!paused)requestAnimationFrame(draw);}
+M.ArtStyles.setStyle(art.value).then(draw);
+</script></body></html>

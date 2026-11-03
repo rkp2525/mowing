@@ -1,0 +1,74 @@
+[
+  {
+    "id": "pixel-character",
+    "transparent": true,
+    "reference": "mockups/character-styles/03-fine-pixel.png",
+    "prompt": "Use reference ONLY for the teal-shirt tan-cargo-trouser teen character's style and identity. Produce a transparent GAME SPRITE ATLAS, exactly 8 equal columns by 4 equal rows, image 2048x1024, cells256 square, no gutters, NO text, NO borders. High overhead orthographic view 50 degrees. Eight columns are facings screen EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST, NORTHWEST, NORTH, NORTHEAST. Rows: 1 standing hands forward at waist, 2 walking left foot forward hands at waist, 3 walking right foot forward hands at waist, 4 seated as on a riding mower with hands on an invisible wheel. Same small-headed slender teenage character throughout, normal proportions, NO scythe, NO mower, NO vehicle, NO ground, NO shadow. Fine clustered pixel rendering as reference. Every character centered at cell x128, feet at y230, head at y24; seated row hip at y170. Preserve substantial empty transparent space left/right. Each complete figure entirely within its own cell. Consistent scale/camera across all32 figures. Crisp digital pixels, no contour outline, no doll joints.",
+    "tool": "built-in image_gen",
+    "cleanup_prompt": "Use case: background-extraction. Edit this exact game sprite atlas ONLY to remove the unwanted white and grey background. All empty areas between and around the 32 figures MUST be fully transparent alpha=0. Keep all character pixels, their original positions, scale, colors, 8-column by 4-row grid, and all poses unchanged. Do not shift, redraw, resize, add frames, add shadows, add text or create any opaque backdrop. Remove the faint white haze as well as solid white. Deliver a genuinely transparent PNG sprite atlas with clean non-white edges. The canvas must keep the exact original dimensions and alignment."
+  },
+  {
+    "id": "pixel-truck",
+    "transparent": true,
+    "reference": "mockups/character-styles/03-fine-pixel.png",
+    "prompt": "Create one isolated transparent game sprite of the compact white-and-olive utility pickup in the reference, carrying the red fuel can, rake and folded mower in its open bed. Fine pixel style matching reference. High overhead orthographic camera50degrees, hood faces SCREEN RIGHT, vehicle rear left, view shows roof and near passenger side. No human, ground, text, labels or scenery. Entire complete truck centered, natural proportions, fills85percent of a landscape canvas, true transparency. Restrained small shadow directly underneath. Sharp pixel clusters, no exterior outline.",
+    "tool": "built-in image_gen"
+  },
+  {
+    "id": "pixel-equipment",
+    "transparent": true,
+    "reference": "mockups/character-styles/03-fine-pixel.png",
+    "prompt": "A transparent GAME EQUIPMENT SPRITE ATLAS: exactly8 equal columns and3equal rows, 2048x768 image, each cell256x256, no margins, text, borders or gutters. Fine pixel rendering matching reference. High overhead orthographic50degree camera. Columns face screen EAST,SE,S,SW,W,NW,N,NE. Row1 quiet manual steel reel mower with olive frame and simple handle. Row2 weathered muted red gas push mower, metal engine and simple handle. Row3 olive-green riding mower with dark empty seat and steering wheel, NO DRIVER. Objects centered in eachcell, body fits x45..210 y60..220, handle may extend upper left within cell. Same consistent scale within each row, sunlight upper left. Physically believable equipment, no toy exaggeration, no people, ground or shadows outside each object. True transparent backgrounds.",
+    "tool": "built-in image_gen"
+  },
+  {
+    "id": "realism-character",
+    "transparent": true,
+    "reference": "mockups/character-styles/10-realism.png",
+    "prompt": "Use the reference for the natural-proportioned brown-haired teenage character in a faded rust T-shirt, charcoal cargo shorts, socks and worn sneakers. Generate an actual transparent GAME SPRITE ATLAS, not a concept sheet: 8 equal columns by4equal rows, image2048x1024, cells256square. No borders, labels, text, ground, tools or shadows. Camera high overhead orthographic50degrees. Columns face screen EAST,SE,S,SW,W,NW,N,NE. Row1 standing arms at waist ready to hold a tool; row2 walking left foot forward arms at waist; row3 walking right foot forward arms at waist; row4 seated hands on invisible steering wheel. Natural small head, slender human anatomy, realistic fabric, soft photographic textured shading with painterly breakup, no doll joints or dark cartoon outlines. Every figure centered at cellx128, feet aty230 and head aty24. Same identity and scale across32frames; seated row hip aty170. Empty background fully transparent. Nothing may cross cell boundaries.",
+    "tool": "built-in image_gen",
+    "cleanup_prompt": "Use case: background-extraction. Edit this exact game sprite atlas ONLY to remove the unwanted white and grey background. All empty areas between and around the 32 figures MUST be fully transparent alpha=0. Keep all character pixels, their original positions, scale, colors, 8-column by 4-row grid, and all poses unchanged. Do not shift, redraw, resize, add frames, add shadows, add text or create any opaque backdrop. Remove the faint white haze as well as solid white. Deliver a genuinely transparent PNG sprite atlas with clean non-white edges. The canvas must keep the exact original dimensions and alignment."
+  },
+  {
+    "id": "realism-truck",
+    "transparent": true,
+    "reference": "mockups/character-styles/10-realism.png",
+    "prompt": "Create one isolated transparent actual game sprite of the used off-white compact utility pickup from the reference, open flatbed containing red fuel can, rake, folded mower and coiled hose. High overhead50degree orthographic game camera. Hood faces SCREEN RIGHT, rear left, roof and near side visible. Natural vehicle proportions, believable fabric/metal/rubber materials, lightly sun-faded paint with subtle age, restrained shading not dramatic grunge. Fine natural detail matching textured realism concept. No character, ground, text, logo or surrounding scenery. Vehicle fills85percent landscapecanvas, centered, fully complete, true transparent background, small contact shadow only.",
+    "tool": "built-in image_gen"
+  },
+  {
+    "id": "realism-equipment",
+    "transparent": true,
+    "reference": "mockups/character-styles/10-realism.png",
+    "prompt": "Transparent actual GAME SPRITE ATLAS for textured realistic lawn mowing equipment. EXACT8equal columns by3equalrows,2048x768, eachcell256square, no lines/gutters/text/margins. High overhead orthographic50degree camera. Columns facing screen EAST,SE,S,SW,W,NW,N,NE. Row1 manually pushed steel reel mower with olive metal frame and wooden grips. Row2 used red-enamel gasoline push mower with detailed small metal engine, black tires and long thin handle. Row3 compact weathered dark olive riding mower, empty seat, steering wheel, NO driver. Each body centered cellx128,y155 and fits x40..215,y60..220; thin handles may extend toward edge but never cross cells. Natural real machinery proportions, softly lit detailed metal textures, no plastic toy effect. Entire empty space true transparent, no background, people or lettering.",
+    "tool": "built-in image_gen"
+  },
+  {
+    "id": "realism-grass",
+    "transparent": false,
+    "reference": null,
+    "prompt": "Generate a production seamless tiling texture for a textured realistic cozy backyard mowing game. Square image1024x1024. Camera looks down at dense lush uncut suburban lawn grass in warm late summer light, natural slender fescue blades with fine painterly material detail. Consistent evenly distributed neutral illumination, grass predominantly medium deep green with muted olive highlights, no flowers, objects, stones, bare spots, horizon, vignette, directional cast shadows or text. No shapes that draw attention on repetition. Allfouredges must tile seamlessly. Photographic material detail softened very slightly like hand-painted realism, no pixelart, no hard outlines. Consistent scale; grass blades small relative image.",
+    "tool": "built-in image_gen"
+  },
+  {
+    "id": "realism-cut",
+    "transparent": false,
+    "reference": null,
+    "prompt": "Generate a production seamless tileable square1024x1024 texture of freshly mowed backyard lawn in textured painterly realism. Top-down orthographic view of very short fine fescue blades, dense soft green carpet with pale warm olive-green tips, fine visible natural grain, subtle mowing direction along vertical imageaxis, regular medium-low contrast and evenly diffused sunlight. No tall tufts, flowers, debris, objects, patches, shadows, horizon, text or vignette. Allfouredges tile perfectly. Natural grass detail, no stylized cartoon blades, no pixelart. This is the satisfying freshly cut ground texture for a cozy realistic lawn-mowing game.",
+    "tool": "built-in image_gen"
+  },
+  {
+    "id": "realism-materials",
+    "transparent": false,
+    "reference": null,
+    "prompt": "Production material texture atlas for a textured realistic suburban backyard game. EXACT3equalcolumns by2equalrows, landscape1536x1024, six512squaretiles completely fillingcanvas, NO labels/gridlines/gutters/padding/text. Each individualtile is independently seamless onitsfour edges, evenly lit, topdown flat material view, fine realistic painterly detail. Row1 left: worn warm grey concrete paving slabs with narrowsoiljoints; center: faded terracotta roof shingles; right: off-white weatherboard house siding with horizontal timber planks, no windows. Row2 left: calm muted blue-green pond water with subtle ripples, no bank; center: pale natural sandbox sand; right: dense leafy green backyard hedge canopy. NOT a composed landscape, ONLY six distinct flat materialtextures. No objects or perspectives, no cartoon outlines, nopixelart.",
+    "tool": "built-in image_gen"
+  },
+  {
+    "id": "realism-nature",
+    "transparent": true,
+    "reference": null,
+    "prompt": "Transparent actual game environment sprite atlas, EXACT4equalcolumns by2equalrows, landscape2048x1024, eight512squarecells without gutters/text/borders. High overhead orthographic50degree gamecamera, natural detailed softly painted realism, no dark exterior outlines. Row1 four separate subjects left to right: medium leafy deciduous backyard tree with visible trunk; larger wide oak tree; mossy grey naturally shaded boulder; dense green clipped shrub. Row2 left to right: cluster ofwhite daisies with thin greenstems; cluster ofred and pink backyard flowers; cluster ofyellow black-eyedSusans; cluster oflavender asters. Eachsubject centered cellx256, groundcontact aty465, fitswithin x35..477,y25..465; treesfillmostcell, floweringclustersfillcentral50percent, rockfillscentral65percent. Fully isolated transparentbackgrounds, no ground platforms or grasspatches, no soft opaque backdrops. Sunfromupperleft, small contactshadows, believable organic textures, no pixelart or cartoonoutlines.",
+    "tool": "built-in image_gen"
+  }
+]

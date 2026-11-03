@@ -1,0 +1,41 @@
+lvl tool     time(s)  par   cov%   stars  pay    refuels  note
+ 1  scythe       28    95   99.2  3      $14        0     rocks:1 flw:7
+ 1  reel         77    95   79.0  0      $0         0    STUCK rocks:0 flw:7
+ 1  gas          76    95   98.3  3      $15        0    STUCK rocks:2 flw:7
+ 1  ride         66    95   99.2  3      $7         3     rocks:23 flw:7
+ 2  scythe       56   120   98.9  3      $13        0     rocks:5 flw:9
+ 2  reel        100   120   93.5  2      $17        0    STUCK rocks:0 flw:6
+ 2  gas         115   120   97.0  3      $1        14    STUCK rocks:46 flw:9
+ 2  ride        118   120   42.0  0      $0         9    STUCK rocks:45 flw:3
+ 3  scythe      131   150   98.1  3      $29        0    STUCK rocks:4 flw:8
+ 3  reel        105   150   90.6  2      $31        0    STUCK rocks:1 flw:8
+ 3  gas         100   150   82.2  1      $1        12    STUCK rocks:40 flw:8
+ 3  ride         62   150    3.8  0      $0        13    STUCK rocks:41 flw:0
+ 4  scythe       98   180   98.8  3      $0         0     rocks:6 flw:24
+ 4  reel        136   180   89.0  1      $6         0    STUCK rocks:4 flw:23
+ 4  gas         117   180   39.2  0      $0        14    STUCK rocks:50 flw:10
+ 4  ride        157   180   43.2  0      $0        18    STUCK rocks:56 flw:17
+ 5  scythe      150   215   98.9  3      $0         0     rocks:9 flw:21
+ 5  reel        138   215   76.4  0      $0         0    STUCK rocks:2 flw:21
+ 5  gas          97   215   16.1  0      $0        12    STUCK rocks:25 flw:0
+ 5  ride        164   215   17.1  0      $0        17    STUCK rocks:52 flw:0
+ 6  scythe      155   260   98.9  3      $55        0     rocks:4 flw:12
+ 6  reel        172   260   97.0  2      $53        0    STUCK rocks:1 flw:12
+ 6  gas         140   260   81.9  1      $0        11    STUCK rocks:18 flw:12
+ 6  ride        215   260   63.3  0      $0        11    STUCK rocks:61 flw:6
+ 7  scythe      175   300   98.9  3      $0         0     rocks:11 flw:30
+ 7  reel        153   300   74.5  0      $0         0    STUCK rocks:3 flw:30
+ 7  gas         119   300   51.9  0      $0        12    STUCK rocks:15 flw:20
+ 7  ride        140   300   49.3  0      $0        13    STUCK rocks:35 flw:12
+ 8  scythe      295   340   98.9  3      $50        0     rocks:12 flw:14
+ 8  reel        257   340   94.9  2      $96        0    STUCK rocks:2 flw:14
+ 8  gas         122   340   51.3  0      $0        12    STUCK rocks:17 flw:6
+ 8  ride        190   340   35.4  0      $0        30    STUCK rocks:45 flw:0
+ 9  scythe      276   380   88.1  1      $0         0    STUCK rocks:8 flw:16
+ 9  reel        232   380   94.9  2      $60        0    STUCK rocks:4 flw:16
+ 9  gas         166   380   61.9  0      $0        16    STUCK rocks:24 flw:13
+ 9  ride        154   380   22.1  0      $0        27    STUCK rocks:0 flw:3
+10  scythe      182   440   46.0  0      $0         0    STUCK rocks:3 flw:29
+10  reel        275   440   93.2  2      $0         0    STUCK rocks:4 flw:44
+10  gas         454   440   30.6  0      $0        58    STUCK rocks:17 flw:12
+10  ride        236   440   38.7  0      $0        26    STUCK rocks:44 flw:12

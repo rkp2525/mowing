@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lawn Kid — art direction mockups</title>
+<style>
+ body{margin:0;background:#1f3a29;color:#fff6dc;font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif;padding:20px}
+ h1{margin:0 0 4px} p.sub{margin:0 0 16px;opacity:.8}
+ .card{background:#2a4a35;border-radius:16px;padding:14px;margin-bottom:22px;box-shadow:0 6px 0 rgba(0,0,0,.25)}
+ .card h2{margin:0 0 2px;font-size:22px}.card p{margin:2px 0 10px;opacity:.85;font-size:14px;line-height:1.4;max-width:900px}
+ canvas{width:100%;max-width:1000px;height:auto;border-radius:10px;display:block}
+</style></head><body>
+<h1>Art direction mockups</h1><p class="sub">Same items, same positions, six directions (A–F). Grass is the approved blade style.</p>
+<div id="root"></div>
+<script src="common.js"></script>
+<script src="style_a.js"></script><script src="style_b.js"></script><script src="style_c.js"></script><script src="style_d.js"></script><script src="style_e.js"></script><script src="style_f.js"></script>
+<script>
+const only=new URLSearchParams(location.search).get('only');
+const dpr=2;
+for(const s of window.STYLES){ if(only&&s.id!==only)continue;
+  const card=document.createElement('div');card.className='card';card.innerHTML=`<h2>${s.id} · ${s.name}</h2><p>${s.blurb}</p>`;
+  const c=document.createElement('canvas');c.width=MK.W*dpr;c.height=MK.H*dpr;card.appendChild(c);document.getElementById('root').appendChild(card);
+  const g=c.getContext('2d');g.scale(dpr,dpr);MK.backdrop(g);
+  try{s.draw(g,MK)}catch(e){console.error(s.id,e);g.fillStyle='#fff';g.font='20px sans-serif';g.fillText('ERROR '+e.message,20,40)}
+}
+</script></body></html>

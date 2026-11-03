@@ -1,0 +1,42 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#1e3a2a;font:11px sans-serif;color:#fff">
+<script src="../js/sprites_build.js"></script>
+<div id="o"></div>
+<script>
+const S = MOW.SpritesBuild, D = 2, P = +(new URLSearchParams(location.search).get("p")||80);           // 2x DPR, P device px
+const q = new URLSearchParams(location.search), mode = q.get('mode') || 'all';
+const o = document.getElementById('o');
+function tile(fn, v, extra) { const c = document.createElement('canvas'); c.width = c.height = P; fn(c.getContext('2d'), P, Object.assign({ v }, extra)); return c; }
+function cv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; c.style.width = w / D + 'px'; c.style.height = h / D + 'px'; o.appendChild(c); return c.getContext('2d'); }
+function label(t) { const d = document.createElement('div'); d.textContent = t; d.style.margin = '4px 6px 0'; o.appendChild(d); }
+const kinds = [['fence'], ['hedge', { inner: false }], ['hedge', { inner: true }], ['roof'], ['wall'], ['path'], ['wild'], ['sand'], ['mulch']];
+if (mode === 'all' || mode === 'rows') {
+  label('variants 0..7 (each kind)');
+  for (const [k, ex] of kinds) { const g = cv(P * 8 + 8 * 4, P); for (let v = 0; v < 8; v++) g.drawImage(tile(S[k], v, ex), v * (P + 4), 0); }
+}
+if (mode === 'all' || mode === 'seam') {
+  label('6x4 repeats (seam test): fence hedge hedgeInner roof path / wild sand mulch');
+  const seams = [['fence'], ['hedge', { inner: false }], ['hedge', { inner: true }], ['roof'], ['path'], ['wild'], ['sand'], ['mulch']];
+  const g = cv(8 * (P * 3 + 6), P * 2);
+  seams.forEach(([k, ex], s) => { for (let j = 0; j < 2; j++) for (let i = 0; i < 3; i++) g.drawImage(tile(S[k], (i + j * 3 + 1) % 8, ex), s * (P * 3 + 6) + i * P, j * P); });
+}
+if (mode === 'all' || mode === 'scene') {
+  label('mini scene 14x8');
+  const W = 14, H = 8, g = cv(W * P, H * P);
+  const T = (fn, v, ex) => tile(fn, v, ex);
+  const h = (x, y, s) => ((x * 7 + y * 13 + s * 5) % 8);
+  const lawn = '#5fb23e';
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let img;
+    const edge = x === 0 || x === W - 1 || y === H - 1 || y === 0;
+    if (y < 3 && x >= 3 && x <= 10) img = y < 2 ? T(S.roof, y === 0 && x === 6 ? 5 : h(x, y, 1) === 5 ? 2 : h(x, y, 1)) : T(S.wall, x === 6 ? 3 : [0, 1, 2, 4, 5, 6, 7][h(x, y, 2) % 7]);
+    else if (y === 0 || (y < 3 && (x === 0 || x === W - 1)) ) img = T(S.hedge, h(x, y, 3), { inner: false });
+    else if (x === 0 || x === W - 1 || y === H - 1) img = T(S.fence, h(x, y, 4));
+    else if (x === 6 && y >= 3 && y < H - 1) img = T(S.path, h(x, y, 5));
+    else if ((x === 10 && y === 5) || (x === 11 && y === 5)) img = T(S.hedge, h(x, y, 6), { inner: true });
+    else if (x === 2 && y === 6) img = T(S.sand, 1);
+    else if (x === 3 && y === 6) img = T(S.sand, 2);
+    else { g.fillStyle = (x + y) % 2 ? '#68bd45' : '#74c64f'; g.fillRect(x * P, y * P, P, P); continue; }
+    g.drawImage(img, x * P, y * P);
+  }
+}
+</script>

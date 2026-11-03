@@ -1,0 +1,19 @@
+#!/bin/bash
+# macOS blocks apps launched from Finder from reading ~/Documents, so serve a copy
+# of the game from ~/.lawnkid-game (refreshed from the source folder when allowed).
+HERE="$(cd "$(dirname "$0")/../../.." && pwd)"
+COPY="$HOME/.lawnkid-game"
+mkdir -p "$COPY"
+/usr/bin/rsync -a --exclude shots --exclude mockups --exclude '*.app' --exclude .obsidian "$HERE/" "$COPY/" 2>/dev/null
+PORT=8765
+URL="http://127.0.0.1:$PORT/index.html"
+if ! /usr/bin/curl -s -o /dev/null --max-time 1 "$URL"; then
+  cd "$COPY" && nohup /usr/bin/python3 -m http.server $PORT --bind 127.0.0.1 </dev/null >/dev/null 2>&1 & disown
+  for i in 1 2 3 4 5 6 7 8 9 10; do /usr/bin/curl -s -o /dev/null --max-time 1 "$URL" && break; sleep 0.3; done
+fi
+CHROME="/Applications/Google Chrome.app"
+if [ -d "$CHROME" ]; then
+  exec "$CHROME/Contents/MacOS/Google Chrome" --user-data-dir="$HOME/.lawnkid-profile" --app="$URL" --window-size=1280,820 --no-first-run --no-default-browser-check
+else
+  exec /usr/bin/open "$URL"
+fi

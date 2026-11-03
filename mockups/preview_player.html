@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#222}canvas{display:block;width:1400px;height:1000px}</style></head><body>
+<canvas id="c"></canvas>
+<script src="../js/sprites_player.js"></script>
+<script>
+const DPR = 2, W = 1400, H = 1000, cv = document.getElementById('c');
+cv.width = W * DPR; cv.height = H * DPR;
+const g = cv.getContext('2d'); g.scale(DPR, DPR);
+for (let y = 0; y < H; y += 48) { g.fillStyle = (y / 48) % 2 ? '#8be05c' : '#78cc50'; g.fillRect(0, y, W, 48); }
+const SP = MOW.SpritesPlayer, hs = [0, 1, 2, 3, 4, 5, 6, 7].map(i => i * Math.PI / 4);
+const tools = ['scythe', 'reel', 'gas', 'ride'];
+function at(x, y, st, truck) { g.save(); g.translate(x, y); truck ? SP.drawTruck(g) : SP.drawPlayer(g, st); g.restore(); }
+tools.forEach((tool, r) => hs.forEach((h, c) => at(95 + c * 172, 150 + r * 165, { tool, heading: h, step: 0.5 + c * 0.7, moving: true, engine: true, cutting: true, t: 0.3 * c, swing: null })));
+const y2 = 830;
+at(80, y2, { tool: 'scythe', heading: 0, step: 0, moving: false, t: 0.4 });
+at(220, y2, { tool: 'scythe', heading: 0, step: 1, moving: true, t: 0.4 });
+at(360, y2, { tool: 'gas', heading: Math.PI / 2, step: 1.2, moving: false, engine: true, t: 0.4 });
+at(500, y2, { tool: 'scythe', heading: 0, step: 0, moving: false, t: 0.4, swing: { a0: 0, t: 0.05, dur: 0.36 } });
+at(670, y2, { tool: 'scythe', heading: 0, step: 0, moving: false, t: 0.4, swing: { a0: 0, t: 0.18, dur: 0.36 } });
+at(840, y2, { tool: 'scythe', heading: 0, step: 0, moving: false, t: 0.4, swing: { a0: 0, t: 0.33, dur: 0.36 } });
+at(1010, y2, { tool: 'scythe', heading: 1.6, step: 0, moving: false, t: 0.4, stall: 1, tired: true });
+at(1190, y2 - 20, {}, true);
+at(1300, 330, { tool: 'ride', heading: 0.3, step: 0, moving: false, t: 0.4, stall: 1 });
+</script></body></html>
