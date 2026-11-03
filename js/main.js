@@ -215,7 +215,7 @@
   }
   function syncToolLabel() {
     const s = G.s; if (!s || s.tool !== 'scythe') return;
-    $('hud-tool-icon').textContent = trimMode ? '✂️' : s.ts.icon; $('hud-tool-name').textContent = trimMode ? 'Trimmers' : s.ts.name;
+    const T = M.TOOLS[s.tool]; $('hud-tool-icon').textContent = trimMode ? '✂️' : T.icon; $('hud-tool-name').textContent = trimMode ? 'Trimmers' : T.name;
     if ($('btn-snip')) $('btn-snip').classList.toggle('on', trimMode);
   }
   // Contextual coaching: only when a sweep is about to clip something, and only until the player has used Cut.
