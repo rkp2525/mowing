@@ -102,7 +102,7 @@
     cv.setPointerCapture(e.pointerId);
   });
   cv.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'mouse') { mouseAcc += Math.hypot(e.clientX - mouse.x, e.clientY - mouse.y); mouse.x = e.clientX; mouse.y = e.clientY; mouse.seen = true; }
+    if (e.pointerType === 'mouse') { if (mouse.seen) mouseAcc += Math.hypot(e.clientX - mouse.x, e.clientY - mouse.y); mouse.x = e.clientX; mouse.y = e.clientY; mouse.seen = true; }
     else if (touch.active && e.pointerId === touch.id) {
       touch.x = e.clientX; touch.y = e.clientY;
       let dx = touch.x - touch.ox, dy = touch.y - touch.oy; const d = Math.hypot(dx, dy), max = 50;
