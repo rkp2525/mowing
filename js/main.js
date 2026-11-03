@@ -91,7 +91,7 @@
       else toggleTrim();
     }
     else {
-      document.body.classList.add('touch');
+      document.body.classList.add('touch'); mouse.seen = false; // touch is now the current input, drop the stale cursor aim
       if (touch.active) return;
       touch.id = e.pointerId; touch.active = true; touch.ox = touch.x = e.clientX; touch.oy = touch.y = e.clientY;
       const jb = $('joy-base'); jb.style.display = 'block'; jb.style.left = touch.ox - 60 + 'px'; jb.style.top = touch.oy - 60 + 'px';
@@ -116,11 +116,11 @@
   };
   cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
   const sb = $('btn-swing');
-  sb.addEventListener('pointerdown', (e) => { swingQueued = true; swHeld = true; sb.classList.add('down'); A.init(); sb.setPointerCapture(e.pointerId); e.preventDefault(); });
+  sb.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') mouse.seen = false; swingQueued = true; swHeld = true; sb.classList.add('down'); A.init(); sb.setPointerCapture(e.pointerId); e.preventDefault(); });
   const sbUp = () => { swHeld = false; sb.classList.remove('down'); };
   sb.addEventListener('pointerup', sbUp); sb.addEventListener('pointercancel', sbUp);
   const nb = $('btn-snip');
-  if (nb) nb.addEventListener('pointerdown', (e) => { toggleTrim(); A.init(); e.preventDefault(); }); // dev pages omit the button
+  if (nb) nb.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') mouse.seen = false; toggleTrim(); A.init(); e.preventDefault(); }); // dev pages omit the button
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
   let kHold = 0, lockToggle = false, lockAxis = null;
