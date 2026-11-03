@@ -162,7 +162,7 @@
       if (travel !== null) {
         const turned = lastTravel === null || Math.abs(Math.atan2(Math.sin(travel - lastTravel), Math.cos(travel - lastTravel))) > 0.45;
         if (turned && aimMode === 'cursor') { aimMode = 'travel'; mouseAcc = 0; }
-        lastTravel = travel;
+        if (aimMode !== 'cursor') lastTravel = travel; // keep the baseline while the cursor aims, so slow turns accumulate
       } else lastTravel = null;
       mouseAcc = Math.max(0, mouseAcc - 150 * dt); // slow drift / trackpad jitter decays away
       if (mouse.seen && !touch.active && mouseAcc > 30) { aimMode = 'cursor'; mouseAcc = 0; }
