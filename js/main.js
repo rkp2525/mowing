@@ -59,6 +59,8 @@
   const keys = {};
   const touch = { id: null, ox: 0, oy: 0, x: 0, y: 0, active: false };
   const mouse = { down: false, snip: false, seen: false, x: 0, y: 0 };
+  // Scythe aim: follows travel direction; the mouse takes over only when moved, until the player turns/moves again.
+  let aimMode = 'travel', mouseAcc = 0, lastTravel = null;
   let trimMode = false, swHeld = false; // C toggles trimmers; Space then trims instead of sweeping
   let swingQueued = false;
   window.addEventListener('keydown', (e) => {
@@ -100,7 +102,7 @@
     cv.setPointerCapture(e.pointerId);
   });
   cv.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'mouse') { mouse.x = e.clientX; mouse.y = e.clientY; mouse.seen = true; }
+    if (e.pointerType === 'mouse') { if (mouse.seen) mouseAcc += Math.hypot(e.clientX - mouse.x, e.clientY - mouse.y); mouse.x = e.clientX; mouse.y = e.clientY; mouse.seen = true; }
     else if (touch.active && e.pointerId === touch.id) {
       touch.x = e.clientX; touch.y = e.clientY;
       let dx = touch.x - touch.ox, dy = touch.y - touch.oy; const d = Math.hypot(dx, dy), max = 50;
@@ -152,11 +154,22 @@
       else if (lockAxis === 'y' && ax > ay * 1.6) lockAxis = 'x';
       if (lockAxis === 'x') { mx = Math.sign(mx) * mg; my = 0; } else { my = Math.sign(my) * mg; mx = 0; }
     } else if (mg <= 0.1) lockAxis = null;
-    // Scythe aim follows the cursor (desktop). Touch / keyboard-only falls back to travel direction.
+    // Scythe aim: travel direction by default. Moving the mouse takes manual control; starting to move or
+    // turning to a new direction hands aim back to travel. Standing still keeps the last aim.
     let aim;
-    if (mouse.seen && !touch.active && G.s && G.s.tool === 'scythe') {
-      const px = (G.s.p.x * C - cam.x) * Z, py = (G.s.p.y * C - cam.y) * Z;
-      if (Math.hypot(mouse.x - px, mouse.y - py) > 10) aim = Math.atan2(mouse.y - py, mouse.x - px);
+    if (G.s && G.s.tool === 'scythe') {
+      const mgNow = Math.hypot(mx, my), travel = mgNow > 0.1 ? Math.atan2(my, mx) : null;
+      if (travel !== null) {
+        const turned = lastTravel === null || Math.abs(Math.atan2(Math.sin(travel - lastTravel), Math.cos(travel - lastTravel))) > 0.45;
+        if (turned && aimMode === 'cursor') { aimMode = 'travel'; mouseAcc = 0; }
+        if (aimMode !== 'cursor') lastTravel = travel; // keep the baseline while the cursor aims, so slow turns accumulate
+      } else lastTravel = null;
+      mouseAcc = Math.max(0, mouseAcc - 150 * dt); // slow drift / trackpad jitter decays away
+      if (mouse.seen && !touch.active && mouseAcc > 30) { aimMode = 'cursor'; mouseAcc = 0; }
+      if (aimMode === 'cursor' && mouse.seen && !touch.active) {
+        const px = (G.s.p.x * C - cam.x) * Z, py = (G.s.p.y * C - cam.y) * Z;
+        if (Math.hypot(mouse.x - px, mouse.y - py) > 10) aim = Math.atan2(mouse.y - py, mouse.x - px);
+      } else if (travel !== null) aim = travel;
     }
     const act = swingQueued; swingQueued = false;
     return { mx, my, act, aim, snip: trimMode, hold: !!(keys.Space || swHeld) };
@@ -167,7 +180,7 @@
   /* ---------------- gameplay flow ---------------- */
   function startLevel(i, toolId) {
     A.init(); applyAudioPrefs();
-    mouse.down = false; trimMode = false; swHeld = false; swingQueued = false;
+    mouse.down = false; trimMode = false; swHeld = false; swingQueued = false; aimMode = 'travel'; mouseAcc = 0; lastTravel = null;
     G.idx = i; G.s = Sim.create(i, save, toolId); R.bake(G.s);
     G.mode = 'play'; G.paused = false; G.res = null; G.toldFuel = false;
     save.tool = toolId; persist();
@@ -355,7 +368,7 @@
 
   function showHow(back_) {
     const el = show(`<div class="panel"><h2>How to Play 🌱</h2><p class="sub">Mow the neighbors' lawns, earn cash, and grow from a kid with a scythe to the town's best groundskeeper.</p>
-      <h3>Move and cut</h3><div class="keys"><div><b>Hold trackpad / mouse click</b></div><div>Slide to steer and walk. Release to stop.</div><div><kbd>W A S D</kbd> / arrows</div><div>Keyboard movement works too. Face where you travel.</div><div><kbd>Space</kbd> / SWING</div><div>Sweep the scythe across open lawn. It aims at your cursor.</div><div><kbd>C</kbd> / right-click</div><div>Switch between the scythe and the trimmers. Space then trims: narrow and precise, for around flowers and rocks.</div><div>Touch</div><div>Drag to move; SWING sweeps; TRIM switches to the trimmers.</div></div>
+      <h3>Move and cut</h3><div class="keys"><div><b>Hold trackpad / mouse click</b></div><div>Slide to steer and walk. Release to stop.</div><div><kbd>W A S D</kbd> / arrows</div><div>Keyboard movement works too. Face where you travel.</div><div><kbd>Space</kbd> / SWING</div><div>Sweep the scythe across open lawn. It faces where you walk; move the mouse to aim by hand.</div><div><kbd>C</kbd> / right-click</div><div>Switch between the scythe and the trimmers. Space then trims: narrow and precise, for around flowers and rocks.</div><div>Touch</div><div>Drag to move; SWING sweeps; TRIM switches to the trimmers.</div></div>
       <details class="control-details"><summary>Optional precision controls</summary><div class="keys"><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Switch tool</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
       <h3>Get paid for quality</h3><div class="keys"><div>🌿 Coverage</div><div>Mow every blade. Dark thick grass takes two passes without a strong mower.</div><div>📏 Stripes</div><div>Long, straight lines look pro.</div><div>🌷 Care</div><div>Don't mow flowers, hit rocks, or smash gnomes. Pick up toys.</div><div>⏱ Speed</div><div>Beat the par time.</div><div>⛽ Fuel</div><div>Powered mowers need refueling at the utility truck.</div></div>
       <div class="row end" style="margin-top:14px"><button class="big-btn" id="b-ok">Got it!</button></div></div>`, 'dim');
@@ -368,7 +381,7 @@
       <label class="art-choice"><input type="radio" name="art-style" value="pixel" ${save.artStyle === 'pixel' ? 'checked' : ''}><span><b>Fine Pixel</b><small>Pixel characters and equipment in our original lush lawns.</small></span></label>
       <label class="art-choice"><input type="radio" name="art-style" value="realism" ${save.artStyle === 'realism' ? 'checked' : ''}><span><b>Textured Realism</b><small>A fully rebuilt world with natural materials and warm summer light.</small></span></label>
       </fieldset><p class="art-status" id="art-status" role="status">Your progress is shared between both styles.</p>
-      <details class="control-details"><summary>Controls</summary><div class="keys"><div><kbd>W A S D</kbd> / arrows</div><div>Move</div><div>Click and hold</div><div>Walk toward the cursor</div><div>Mouse</div><div>Aim the scythe</div><div><kbd>Space</kbd></div><div>Sweep with the scythe, or trim with the trimmers</div><div><kbd>C</kbd> / right-click</div><div>Switch scythe ⇄ trimmers (precise, for flowers and rocks)</div><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Switch tool</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
+      <details class="control-details"><summary>Controls</summary><div class="keys"><div><kbd>W A S D</kbd> / arrows</div><div>Move</div><div>Click and hold</div><div>Walk toward the cursor</div><div>Mouse</div><div>Aim by hand. Otherwise the scythe faces where you walk</div><div><kbd>Space</kbd></div><div>Sweep with the scythe, or trim with the trimmers</div><div><kbd>C</kbd> / right-click</div><div>Switch scythe ⇄ trimmers (precise, for flowers and rocks)</div><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Switch tool</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
       <div class="set-row"><label for="s-guide">Scythe guide</label><input type="checkbox" id="s-guide" ${save.scytheGuide ? 'checked' : ''}></div>
       <div class="set-row"><label>Music</label><input type="range" id="s-mus" min="0" max="100" value="${save.music * 100}"></div>
       <div class="set-row"><label>Effects</label><input type="range" id="s-sfx" min="0" max="100" value="${save.sfx * 100}"></div>
