@@ -440,7 +440,7 @@
     if (SP) {
       const p = s.p, f = C / 48;
       g.save(); g.translate(p.x * C, p.y * C); g.scale(f, f);
-      SP.drawPlayer(g, { tool: s.ts.id, reach: s.ts.width * .95 * 48, heading: s.ts.id === 'scythe' ? (p.aimHeading !== undefined ? p.aimHeading : p.heading) : p.heading, step: p.step, moving: s.moving, swing: s.sw ? { a0: s.sw.a0, t: s.sw.t, dur: s.sw.dur, half: s.sw.snip ? .35 : s.sw.halfArc } : null, trim: !!s.trim, engine: !!s.engine, cutting: !!s.cutting, stall: s.stall, tired: !!s.tired, t });
+      SP.drawPlayer(g, { tool: s.ts.id, reach: s.ts.width * .95 * 48, heading: s.ts.id === 'scythe' ? (p.aimHeading !== undefined ? p.aimHeading : p.heading) : p.heading, step: p.step, moving: s.moving, swing: s.sw ? { a0: s.sw.a0, t: s.sw.t, dur: s.sw.dur, half: s.sw.snip ? .35 : s.sw.halfArc } : null, trim: !!(s.sw ? s.sw.snip : s.trim), engine: !!s.engine, cutting: !!s.cutting, stall: s.stall, tired: !!s.tired, t });
       g.restore(); return;
     }
     const p = s.p, Tl = s.ts, X = p.x * C, Y = p.y * C, h = p.heading;
@@ -548,7 +548,8 @@
   /* cutting-footprint preview (helps precise steering) */
   function drawFootprint(g, s) {
     const p = s.p, Tl = s.ts; if (s.stall > 0 || (Tl.powered && s.fuel <= 0)) return;
-    const X = p.x * C, Y = p.y * C;
+    // during a swing the arc is planted at the swing origin; idle previews follow the player
+    const X = (s.sw && s.sw.ox !== undefined ? s.sw.ox : p.x) * C, Y = (s.sw && s.sw.oy !== undefined ? s.sw.oy : p.y) * C;
     g.save();
     if (Tl.id === 'scythe') {
       const plan = s.sw || s.aimPlan; if (!plan) { g.restore(); return; }

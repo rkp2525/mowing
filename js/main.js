@@ -120,7 +120,7 @@
   const sbUp = () => { swHeld = false; sb.classList.remove('down'); };
   sb.addEventListener('pointerup', sbUp); sb.addEventListener('pointercancel', sbUp);
   const nb = $('btn-snip');
-  nb.addEventListener('pointerdown', (e) => { toggleTrim(); A.init(); e.preventDefault(); });
+  if (nb) nb.addEventListener('pointerdown', (e) => { toggleTrim(); A.init(); e.preventDefault(); }); // dev pages omit the button
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
   let kHold = 0, lockToggle = false, lockAxis = null;
@@ -197,8 +197,8 @@
   function setZoom(v) { zoomOff = clamp(v, -3, 4); computeZ(); A.click(); }
   function updateHudTool() {
     const T = M.TOOLS[G.s.tool];
-    $('hud-tool-icon').textContent = T.icon; $('hud-tool-name').textContent = T.name; if (T.id === 'scythe') { trimMode = false; $('btn-snip').classList.remove('on'); }
-    $('btn-swing').style.display = G.s.tool === 'scythe' ? '' : 'none'; $('btn-snip').style.display = G.s.tool === 'scythe' ? '' : 'none';
+    $('hud-tool-icon').textContent = T.icon; $('hud-tool-name').textContent = T.name; if (T.id === 'scythe') { trimMode = false; if ($('btn-snip')) $('btn-snip').classList.remove('on'); }
+    $('btn-swing').style.display = G.s.tool === 'scythe' ? '' : 'none'; if ($('btn-snip')) $('btn-snip').style.display = G.s.tool === 'scythe' ? '' : 'none';
     const lbl = $('meter-label');
     $('meter-label').parentElement.style.display = G.s.tool === 'reel' ? 'none' : '';
     lbl.textContent = T.powered ? 'Fuel' : 'Stamina';
@@ -216,7 +216,7 @@
   function syncToolLabel() {
     const s = G.s; if (!s || s.tool !== 'scythe') return;
     $('hud-tool-icon').textContent = trimMode ? '✂️' : s.ts.icon; $('hud-tool-name').textContent = trimMode ? 'Trimmers' : s.ts.name;
-    $('btn-snip').classList.toggle('on', trimMode);
+    if ($('btn-snip')) $('btn-snip').classList.toggle('on', trimMode);
   }
   // Contextual coaching: only when a sweep is about to clip something, and only until the player has used Cut.
   let lastCoach = -99;

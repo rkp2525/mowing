@@ -223,7 +223,7 @@
     if (nearTruck) s.stamina = Math.min(T.staminaMax, s.stamina + 25 * dt);
 
     // ---- tool logic
-    const dc = dirCode(p.heading);
+    let dc = dirCode(p.heading);
     let cutN = 0, engineOn = false, cutting = false;
     if (T.id === 'scythe') {
       s.swCool -= dt;
@@ -265,6 +265,8 @@
     } else { // reel
       cutting = s.stall <= 0 && p.speed > 0.6;
     }
+    // scythe grass direction (stripe scoring) follows the swing, not the body's last travel direction
+    if (T.id === 'scythe') dc = dirCode(s.sw ? s.sw.a0 : p.aimHeading);
     s.cutting = cutting; s.engine = engineOn;
 
     const fp = cutting ? makeFootprint(s) : null;

@@ -69,7 +69,7 @@
     if(sw&&u>.55){g.fillStyle='rgba(190,240,120,.85)';const tip=[hand[0]+Math.cos(a)*(px+L),hand[1]+Math.sin(a)*(px+L)];for(let i=0;i<3;i++){g.beginPath();g.arc(tip[0]+(i-1)*.7,tip[1]+((u*20+i*1.7)%1.6),.26,0,TAU);g.fill();}}
   }
   function drawScythe(g,s,t) {
-    if(s.trim||(s.sw&&s.sw.snip))return drawTrimmers(g,s,t);
+    if(s.sw?s.sw.snip:s.trim)return drawTrimmers(g,s,t);
     const p=s.p,sw=s.sw,sp=M.SCYTHE;
     const plan=sw||s.aimPlan,half=plan&&plan.halfArc!==undefined?plan.halfArc:sp.halfArc;
     const aim=plan?(sw?sw.a0:plan.angle):(p.aimHeading??p.heading);
