@@ -361,6 +361,10 @@
       noiseShot({ t: t + 0.12, d: 0.22, a: 0.04, f: 1500, f2: 500, q: 0.8, v: 0.06 });
       noiseShot({ t: t, d: 0.30, a: 0.12, f: 180, f2: 320, q: 0.7, v: 0.05 });
     },
+    snipswing: function () {
+      var t = now();
+      noiseShot({ t: t, d: 0.16, a: 0.05, f: 900, f2: 2200, q: 1.4, v: 0.07 });
+    },
     snip: function (n) {
       var t = now();
       if (t - lastSnip < 1 / 14) return;

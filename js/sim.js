@@ -42,7 +42,7 @@
       save: save || {}, cutH: 0, cutV: 0, powerCut: 0,
       flowersLost: 0, rockHits: 0, gnomesFound: 0, gnomesBroken: 0, toysFound: 0, toysChopped: 0,
       gnomesTotal: 0, toysTotal: 0, refueling: false, sputterT: 0, wet: false, tiredEv: false,
-      toolsUsed: {}, moving: false, lastSwing: 0, actWasDown: false, aimPlan: null, aimTimer: 0,
+      toolsUsed: {}, moving: false, lastSwing: 0, actWasDown: false, aimPlan: null,
     };
     const count=M.GRASS_SUBDIV**2;
     for(let i=0;i<n;i++){
@@ -62,7 +62,7 @@
     const old = s.ts;
     s.tool = toolId; s.ts = toolStats(toolId, s.save);
     s.toolsUsed[toolId] = true;
-    s.sw = null; s.aimPlan = null; s.aimTimer = 0;
+    s.sw = null; s.aimPlan = null;
     s.fuel = old ? Math.min(s.fuel, s.ts.fuelMax) : s.ts.fuelMax;
     s.stamina = Math.min(s.stamina, s.ts.staminaMax);
   }
@@ -123,73 +123,28 @@
     }
     return true;
   }
-  // Smart aim protects rocks and trees only. Flowers are the player's job to
-  // steer around (manual aim), so a careless auto-swing can still clip them.
-  function nearbyHazards(s, reach) {
-    return s.ents.filter(e => e.alive && ['rock', 'tree'].includes(e.t) && Math.hypot(e.x-s.p.x,e.y-s.p.y) <= reach + .8);
-  }
-  function sweepSafe(s, angle, halfArc, reach, hazards) {
-    for (const e of hazards || nearbyHazards(s, reach)) {
-      const dx=e.x-s.p.x,dy=e.y-s.p.y,d=Math.hypot(dx,dy);
-      const radius=e.t==='flower'?.20:e.t==='rock'?.55:e.size===2?.55:.35;
-      if (d-radius > reach) continue;
-      if (d <= radius) return false;
-      if (Math.abs(angDiff(angle,Math.atan2(dy,dx))) <= halfArc+M.SCYTHE.bladeAngle+Math.asin(Math.min(1,radius/d))) return false;
-    }
-    return true;
-  }
-  function planScythe(s, preferred, moving) {
-    const p=s.p,R=s.ts.width*.95,N=M.GRASS_SUBDIV,count=N*N,targets=[],hazards=nearbyHazards(s,R);
-    for(let cy=Math.max(0,Math.floor(p.y-R));cy<=Math.min(s.H-1,Math.ceil(p.y+R));cy++)
-      for(let cx=Math.max(0,Math.floor(p.x-R));cx<=Math.min(s.W-1,Math.ceil(p.x+R));cx++){
-        const i=cy*s.W+cx;if(!s.grass[i])continue;
-        const stride=s.subRemaining[i]===count?2:1;
-        for(let y=0;y<N;y+=stride)for(let x=0;x<N;x+=stride){
-          if(!s.subGrass[i*count+y*N+x])continue;
-          const X=cx+(x+.5)/N,Y=cy+(y+.5)/N,dx=X-p.x,dy=Y-p.y,d=Math.hypot(dx,dy);
-          if(d<.03||d>R||!bladeClear(s,X,Y))continue;
-          targets.push({angle:Math.atan2(dy,dx),d,weight:stride*stride/count});
-        }
-      }
-    const candidates=[preferred,Number.isFinite(p.aimHeading)?p.aimHeading:preferred];
-    for(let i=0;i<32;i++)candidates.push(i*Math.PI/16);
-    let best=null,bestScore=-Infinity;
-    for(const angle of candidates){
-      const turn=Math.abs(angDiff(preferred,angle));
-      if(moving&&turn>Math.PI*.67)continue;
-      for(const halfArc of [M.SCYTHE.halfArc,.30,.10]){
-        let safeReach=R;
-        for(const e of hazards){
-          const dx=e.x-p.x,dy=e.y-p.y,d=Math.hypot(dx,dy),radius=e.t==='flower'?.20:e.t==='rock'?.55:e.size===2?.55:.35;
-          if(d<=radius){safeReach=0;break;}
-          if(Math.abs(angDiff(angle,Math.atan2(dy,dx)))<=halfArc+M.SCYTHE.bladeAngle+Math.asin(Math.min(1,radius/d)))safeReach=Math.min(safeReach,d-radius-.02);
-        }
-        for(const reach of [safeReach,Math.min(safeReach,R*.65)]){
-          if(reach<.18||!sweepSafe(s,angle,halfArc,reach,hazards))continue;
-        let gain=0;
-        for(const target of targets)if(target.d<=reach&&Math.abs(angDiff(angle,target.angle))<halfArc+M.SCYTHE.bladeAngle)gain+=target.weight;
-        if(gain<=0&&targets.length)continue;
-        const score=gain*(1-.12*turn/Math.PI)-turn*.025+(halfArc/M.SCYTHE.halfArc)*.002;
-        if(score>bestScore){bestScore=score;best={angle,halfArc,reach,safe:true,gain,assisted:true};}
-        }
-      }
-    }
-    return best || {angle:preferred,halfArc:.10,reach:R,safe:false,gain:0,assisted:true};
+  // Scythe modes. The swing always goes exactly where the player aims (cursor).
+  //   sweep: wide arc, full reach, fast over open lawn (will clip flowers / hit rocks)
+  //   snip : narrow cone, shorter reach, cheap, for precise work around flowers & rocks
+  function scytheMode(T, snip) {
+    const S = M.SCYTHE, R = T.width * .95;
+    return snip
+      ? { snip: true, halfArc: S.snip.halfArc, blade: S.snip.blade, reach: R * S.snip.reach, dur: S.snip.duration, stamina: S.snip.stamina, cool: S.snip.cool }
+      : { snip: false, halfArc: S.halfArc, blade: S.bladeAngle, reach: R, dur: S.duration, stamina: 3.5, cool: .06 };
   }
 
-  const SW_DUR = M.SCYTHE.duration;
 
   /* Is world point (x,y) inside the current cutting footprint? */
   function makeFootprint(s) {
     const p = s.p, T = s.ts;
     if (T.id === 'scythe') {
       if (!s.sw) return null;
-      const R = s.sw.reach || T.width * .95, half = s.sw.halfArc ?? M.SCYTHE.halfArc, a = s.sw.a0 - half + 2 * half * (s.sw.t / SW_DUR);
+      const R = s.sw.reach || T.width * .95, half = s.sw.halfArc ?? M.SCYTHE.halfArc, a = s.sw.a0 - half + 2 * half * Math.min(1, s.sw.t / s.sw.dur), blade = s.sw.blade;
       const ox = s.sw.ox, oy = s.sw.oy; // arc stays planted where the swing began, so it clears what was previewed
       return (x, y, m) => {
         const dx = x - ox, dy = y - oy, d = Math.hypot(dx, dy);
         if (d > R + m || d < 0.03) return false;
-        return Math.abs(angDiff(a, Math.atan2(dy, dx))) < M.SCYTHE.bladeAngle + m * 0.3 && bladeClear(s,x,y,ox,oy);
+        return Math.abs(angDiff(a, Math.atan2(dy, dx))) < blade + m * 0.3 && bladeClear(s,x,y,ox,oy);
       };
     }
     const hx = Math.cos(p.heading), hy = Math.sin(p.heading);
@@ -233,7 +188,7 @@
     let want = T.speed * mag * alignF;
     if (fuelOut) want *= 0.4;
     if (T.id === 'scythe' && s.tired) want *= 0.55;
-    if (T.id === 'scythe' && s.sw) want *= 0.3; // plant your feet mid-swing
+    if (T.id === 'scythe' && s.sw) want *= s.sw.snip ? 0.85 : 0.6; // plant your feet mid-swing
     // sprinklers
     s.wet = false;
     for (const e of s.ents) {
@@ -271,30 +226,31 @@
     const dc = dirCode(p.heading);
     let cutN = 0, engineOn = false, cutting = false;
     if (T.id === 'scythe') {
-      s.swCool -= dt; s.aimTimer -= dt;
-      const manual = Number.isFinite(inp.aim) || (Number.isFinite(inp.turn) && inp.turn !== 0) || inp.assist === false;
-      if (manual) {
-        if (Number.isFinite(inp.turn)) p.aimHeading += inp.turn * 2.3 * dt;
-        if (Number.isFinite(inp.aim)) p.aimHeading=inp.aim;
-        s.aimPlan={angle:p.aimHeading,halfArc:M.SCYTHE.halfArc,reach:T.width*.95,safe:true,gain:0,assisted:false};
-      } else if (!s.sw && (pressed || s.aimTimer<=0)) {
-        s.aimPlan=planScythe(s,p.heading,mag>.1);p.aimHeading=s.aimPlan.angle;s.aimTimer=.12;
+      s.swCool -= dt;
+      // Aim follows the cursor (inp.aim). Without a cursor (touch / keys) it follows travel.
+      if (Number.isFinite(inp.aim)) p.aimHeading = inp.aim; else if (mag > .1) p.aimHeading = p.heading;
+      const mode = scytheMode(T, !!inp.snip);
+      s.trim = mode.snip;
+      s.aimPlan = { angle: p.aimHeading, halfArc: mode.halfArc, blade: mode.blade, reach: mode.reach, snip: mode.snip };
+      // what would this sweep hit? (drives the contextual "Hold C to cut" prompt and the warning ring)
+      const sweepM = mode, spread = mode.halfArc + mode.blade;
+      s.aimHit = null;
+      for (const e of s.ents) {
+        if (!e.alive || (e.t !== 'flower' && e.t !== 'rock')) continue;
+        const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy), rad = e.t === 'rock' ? .55 : .2;
+        if (d - rad > sweepM.reach) continue;
+        const da = Math.abs(angDiff(p.aimHeading, Math.atan2(dy, dx)));
+        if (d <= rad || da <= spread + Math.asin(Math.min(1, rad / d))) { s.aimHit = { x: e.x, y: e.y, t: e.t }; break; }
       }
-      if (!s.sw && pressed && s.swCool<=0 && s.stamina>0 && !s.tired && s.stall<=0) {
-        const plan=s.aimPlan || planScythe(s,p.heading,mag>.1);
-        if (plan.safe) {
-          if(mag<=.1)p.heading=plan.angle;
-          s.sw={t:0,a0:plan.angle,halfArc:plan.halfArc,reach:plan.reach,assisted:plan.assisted,ox:p.x,oy:p.y};
-          s.stamina-=3.5;ev.push({e:'swing'});
-          if(s.stamina<=.5){s.tired=true;ev.push({e:'tired'});}
-        }else ev.push({e:'careful'});
-      }
-      if(s.sw&&s.sw.assisted&&!sweepSafe(s,s.sw.a0,s.sw.halfArc,s.sw.reach)){
-        s.sw=null;s.swCool=.08;ev.push({e:'careful'});
+      const wantSwing = mode.snip ? (pressed || !!inp.hold) : pressed; // trimmers repeat while Space is held // snip repeats while held; sweep is one per press
+      if (!s.sw && wantSwing && s.swCool <= 0 && s.stamina > 0 && !s.tired && s.stall <= 0) {
+        s.sw = { t: 0, a0: p.aimHeading, halfArc: mode.halfArc, blade: mode.blade, reach: mode.reach, dur: mode.dur, snip: mode.snip, cool: mode.cool, ox: p.x, oy: p.y };
+        s.stamina -= mode.stamina; ev.push({ e: mode.snip ? 'snip' : 'swing' });
+        if (s.stamina <= .5) { s.tired = true; ev.push({ e: 'tired' }); }
       }
       if (s.sw) {
         s.sw.t += dt; cutting = true;
-        if (s.sw.t >= SW_DUR) { s.sw = null; s.swCool = 0.06; }
+        if (s.sw.t >= s.sw.dur) { s.swCool = s.sw.cool; s.sw = null; }
       } else {
         s.stamina = Math.min(T.staminaMax, s.stamina + T.staminaRegen * dt);
         if (s.tired && s.stamina > T.staminaMax * 0.3) s.tired = false;
@@ -388,5 +344,5 @@
     return { cov, covN, pattern, care, speed, score: sc, stars, payBase: Math.round(payBase), bonusGnome, bonusToy, fines, cardsMult: mult, pay, time: s.time };
   }
 
-  M.Sim = { create, step, setTool, coverage, score, toolStats, collides, DIR, dirCode, upgradeLv, blockedCell, planScythe, sweepSafe, makeFootprint, grassPattern };
+  M.Sim = { create, step, setTool, coverage, score, toolStats, collides, DIR, dirCode, upgradeLv, blockedCell, scytheMode, makeFootprint, grassPattern };
 })();
