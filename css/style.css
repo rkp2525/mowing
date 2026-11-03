@@ -138,3 +138,8 @@ body.touch .finish.ready { animation: none; }
 
 .control-details { margin:14px 0; color:var(--ink2); font-size:14px; }
 .control-details summary { cursor:pointer; margin-bottom:10px; }
+
+.snip-btn { right: calc(124px + env(safe-area-inset-right)); bottom: calc(40px + env(safe-area-inset-bottom)); width: 68px; height: 68px; font-size: 13px; background: rgba(70, 150, 200, .92); box-shadow: 0 5px 0 #2f6e96, 0 8px 16px rgba(0, 0, 0, .3); }
+.snip-btn:active, .snip-btn.down { transform: translateY(3px); box-shadow: 0 2px 0 #2f6e96; }
+
+.snip-btn.on { background: rgba(40, 110, 170, 1); outline: 3px solid rgba(255,255,255,.85); }

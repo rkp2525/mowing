@@ -440,7 +440,7 @@
     if (SP) {
       const p = s.p, f = C / 48;
       g.save(); g.translate(p.x * C, p.y * C); g.scale(f, f);
-      SP.drawPlayer(g, { tool: s.ts.id, reach: s.ts.width * .95 * 48, heading: p.heading, step: p.step, moving: s.moving, swing: s.sw ? { a0: s.sw.a0, t: s.sw.t, dur: M.SCYTHE.duration } : null, engine: !!s.engine, cutting: !!s.cutting, stall: s.stall, tired: !!s.tired, t });
+      SP.drawPlayer(g, { tool: s.ts.id, reach: s.ts.width * .95 * 48, heading: s.ts.id === 'scythe' ? (p.aimHeading !== undefined ? p.aimHeading : p.heading) : p.heading, step: p.step, moving: s.moving, swing: s.sw ? { a0: s.sw.a0, t: s.sw.t, dur: s.sw.dur, half: s.sw.snip ? .35 : s.sw.halfArc } : null, trim: !!(s.sw ? s.sw.snip : s.trim), engine: !!s.engine, cutting: !!s.cutting, stall: s.stall, tired: !!s.tired, t });
       g.restore(); return;
     }
     const p = s.p, Tl = s.ts, X = p.x * C, Y = p.y * C, h = p.heading;
@@ -547,20 +547,35 @@
 
   /* cutting-footprint preview (helps precise steering) */
   function drawFootprint(g, s) {
-    const p = s.p, Tl = s.ts; if (Tl.id==='scythe' && s.save.scytheGuide !== true) return; if (s.stall > 0 || (Tl.powered && s.fuel <= 0)) return;
-    const X = p.x * C, Y = p.y * C, h = s.sw ? s.sw.a0 : (s.aimPlan ? s.aimPlan.angle : p.aimHeading ?? p.heading);
-    g.save(); g.setLineDash([1.6, 1.4]); g.lineWidth = 0.35; g.strokeStyle = 'rgba(255,255,255,.55)'; g.fillStyle = 'rgba(255,255,255,.07)';
+    const p = s.p, Tl = s.ts; if (s.stall > 0 || (Tl.powered && s.fuel <= 0)) return;
+    // during a swing the arc is planted at the swing origin; idle previews follow the player
+    const X = (s.sw && s.sw.ox !== undefined ? s.sw.ox : p.x) * C, Y = (s.sw && s.sw.oy !== undefined ? s.sw.oy : p.y) * C;
+    g.save();
     if (Tl.id === 'scythe') {
-      const plan=s.sw||s.aimPlan,R=(plan&&plan.reach||Tl.width*.95)*C,half=plan&&plan.halfArc!==undefined?plan.halfArc:M.SCYTHE.halfArc;
-      const danger = s.ents.some(e => {
-        if (e.t !== 'flower' || !e.alive) return false;
-        const dx = e.x * C - X, dy = e.y * C - Y;
-        const angle = Math.atan2(Math.sin(Math.atan2(dy, dx) - h), Math.cos(Math.atan2(dy, dx) - h));
-        return Math.hypot(dx, dy) <= R + C * .1 && Math.abs(angle) <= half + M.SCYTHE.bladeAngle + .03;
-      });
-      if (danger) { g.strokeStyle = 'rgba(255,163,122,.95)'; g.fillStyle = 'rgba(240,111,78,.15)'; }
-      g.beginPath(); g.moveTo(X, Y); g.arc(X, Y, R, h - half - M.SCYTHE.bladeAngle, h + half + M.SCYTHE.bladeAngle); g.closePath(); g.fill(); g.stroke();
+      const plan = s.sw || s.aimPlan; if (!plan) { g.restore(); return; }
+      const h = s.sw ? s.sw.a0 : plan.angle, R = plan.reach * C, spread = plan.halfArc + (plan.blade !== undefined ? plan.blade : M.SCYTHE.bladeAngle);
+      const wd = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+      // flowers and rocks near the player get a soft ring so they are easy to see and aim around
+      let danger = false;
+      for (const e of s.ents) {
+        if (!e.alive || (e.t !== 'flower' && e.t !== 'rock')) continue;
+        const dx = e.x * C - X, dy = e.y * C - Y, d = Math.hypot(dx, dy), rad = (e.t === 'rock' ? .55 : .2) * C;
+        if (d > 5.5 * C) continue;
+        const hit = d - rad <= R && Math.abs(wd(Math.atan2(dy, dx) - h)) <= spread + Math.asin(Math.min(1, rad / Math.max(d, rad + .01)));
+        if (hit) danger = true;
+        if (!hit && !(s.save && s.save.scytheGuide === true)) continue;
+        g.setLineDash([1.2, 1.2]); g.lineWidth = .35;
+        g.strokeStyle = hit ? 'rgba(255,120,90,.9)' : 'rgba(255,255,255,.35)';
+        g.beginPath(); g.arc(e.x * C, e.y * C, rad + (e.t === 'rock' ? 1 : 2.2), 0, Math.PI * 2); g.stroke();
+      }
+      if (!plan.snip && !(s.save && s.save.scytheGuide === true)) { g.restore(); return; } // zen: sweep shows nothing; trimmers show their narrow cone
+      g.setLineDash(plan.snip ? [] : [1.6, 1.4]); g.lineWidth = plan.snip ? .5 : .35;
+      g.strokeStyle = danger ? 'rgba(255,150,110,.95)' : (plan.snip ? 'rgba(160,225,255,.9)' : 'rgba(255,255,255,.5)');
+      g.fillStyle = danger ? 'rgba(240,100,70,.16)' : (plan.snip ? 'rgba(130,200,255,.14)' : 'rgba(255,255,255,.07)');
+      g.beginPath(); g.moveTo(X, Y); g.arc(X, Y, R, h - spread, h + spread); g.closePath(); g.fill(); g.stroke();
     } else {
+      const h = p.heading;
+      g.setLineDash([1.6, 1.4]); g.lineWidth = 0.35; g.strokeStyle = 'rgba(255,255,255,.55)'; g.fillStyle = 'rgba(255,255,255,.07)';
       const reach = (Tl.r + 0.35) * C, half = Tl.width * 0.5 * C, depth = Tl.cutDepth * C;
       g.translate(X, Y); g.rotate(h); g.beginPath(); g.rect(reach - depth, -half, depth * 2, half * 2); g.fill(); g.stroke();
     }

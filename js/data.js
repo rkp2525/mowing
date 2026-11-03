@@ -6,7 +6,8 @@
 
   M.CELL = 8;      // world pixels per grass cell
   // Original full-width sweep; smart aim can still trim near protected objects.
-  M.SCYTHE = { duration: 0.36, halfArc: 1.25, bladeAngle: 0.50 };
+  M.SCYTHE = { duration: 0.36, halfArc: 1.25, bladeAngle: 0.50,
+    snip: { duration: 0.2, halfArc: 0.10, blade: 0.17, reach: 0.8, stamina: 1.2, cool: 0.03 } };
   M.GRASS_SUBDIV = 8; // sub-cell mowing keeps the cut edge aligned with the deck
   M.MARGIN = 6;    // void cells padded around every lawn
   M.T = { VOID: 0, GRASS: 1, PATH: 2, HOUSE: 3, WATER: 4, SAND: 5, TREE: 6, HEDGE: 7 };
@@ -115,7 +116,7 @@
   L.push({
     id: 1, name: 'Mrs. Albright’s Front Yard', owner: 'Mrs. Albright', emoji: '👵',
     quote: '“Oh, you dear! Just the front lawn, please. Mind my tulips!”',
-    tip: 'Hold the trackpad click and slide to move, or use WASD. Press SPACE to cut. The scythe finds nearby grass and trims carefully around flowers and rocks.',
+    tip: 'Hold the trackpad click and slide to move, or use WASD. The scythe aims at your cursor. SPACE sweeps. Press C for the trimmers, then SPACE trims precisely around flowers and rocks.',
     w: 22, h: 15, pay: 22, par: 95, rec: 'scythe', fence: 'picket', theme: 0,
     build(B) {
       B.rect(0, 0, 22, 15, '.'); B.rect(0, 0, 22, 3, 'H');

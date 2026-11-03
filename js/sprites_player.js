@@ -307,7 +307,9 @@
       const sw = st.swing;
       const spec = window.MOW.SCYTHE || { duration: .36, halfArc: .60 };
       const dur = (sw && sw.dur) || spec.duration;
-      const ang = sw ? sw.a0 - spec.halfArc + 2 * spec.halfArc * Math.max(0, Math.min(1, sw.t / dur)) : h + spec.halfArc;
+      const half = (sw && sw.half) || spec.halfArc;
+      const trim = !!st.trim; // hedge trimmers instead of the scythe
+      const ang = sw ? sw.a0 - half + 2 * half * Math.max(0, Math.min(1, sw.t / dur)) : (trim ? h : h + spec.halfArc);
       const fx = sw ? Math.cos(ang) : c, fy = sw ? Math.sin(ang) : s;
       const k = Object.assign({ x: 0, y: 0, dx: c, dy: s }, base);
       shadow(g, 2, 3, 17, 7.5, 0.55);
@@ -319,12 +321,13 @@
       const E = [ca * R, sa * R - 2];
       const hands = [H0, H1];
       if (hands[0][0] > hands[1][0]) { hands[0] = H1; hands[1] = H0; }
+      if (trim) hands[1] = [H0[0] + ca * 10, H0[1] + sa * 10];
       const dirp = [(E[0] - H0[0]), (E[1] - H0[1])], dl = Math.hypot(dirp[0], dirp[1]);
       const sx0 = H0[0] - dirp[0] / dl * 8, sy0 = H0[1] - dirp[1] / dl * 8;
       const tx = -sa, ty = ca; // tangent (swing direction)
       const scythe = () => {
         if (sw) { // swoosh trail
-          const a1 = sw.a0 - spec.halfArc, n = 7;
+          const a1 = sw.a0 - half, n = 7;
           for (let i = 0; i < n; i++) {
             const u0 = i / n, u1 = (i + 1) / n, aa = a1 + (ang - a1) * u0, bb = a1 + (ang - a1) * u1;
             g.strokeStyle = 'rgba(255,255,255,' + (0.05 + 0.4 * u1 * u1) + ')'; g.lineWidth = 2.5 + 5 * u1; g.lineCap = 'round';
@@ -340,8 +343,35 @@
         g.closePath();
         fillOut(g, lin(g, bx, by, bx + tx * 27, by + ty * 27, [[0, '#d9e0ea'], [0.5, '#ffffff'], [1, '#aab4c3']]), 1.2);
       };
+      /* hedge trimmers: orange motor housing + double-toothed blade, drawn in a frame along the aim */
+      const trimmers = () => {
+        const u = sw ? Math.max(0, Math.min(1, sw.t / dur)) : 0, shake = sw ? Math.sin(u * 28) * 1.1 : 0;
+        g.save(); g.translate(H0[0], H0[1]); g.rotate(ang);
+        // blade: long flat bar with teeth on both sides (teeth slide while trimming)
+        const bx0 = 12, bl = 46, n = 9;
+        for (const side of [-1, 1]) {
+          g.beginPath(); g.moveTo(bx0, 0);
+          for (let i = 0; i < n; i++) {
+            const x = bx0 + bl * i / n + (side > 0 ? shake : -shake), x2 = x + bl / n * .5, x3 = x + bl / n;
+            g.lineTo(x, side * 3.2); g.lineTo(x2, side * 7.6); g.lineTo(x3, side * 3.2);
+          }
+          g.lineTo(bx0 + bl, 0); g.closePath();
+          fillOut(g, lin(g, 0, side * -8, 0, side * 8, [[0, '#e9eef5'], [1, '#9aa6b6']]), 1);
+        }
+        rr(g, bx0, -3.4, bl, 6.8, 2.2); fillOut(g, lin(g, 0, -3.4, 0, 3.4, [[0, '#f3f6fa'], [1, '#b7c0cd']]), 1);
+        // guard + housing
+        rr(g, bx0 - 4, -8, 5, 16, 2.5); fillOut(g, '#3a3f49', 1);
+        rr(g, -9, -7.5, 22, 15, 6); fillOut(g, lin(g, 0, -7.5, 0, 7.5, [[0, '#ffa04d'], [1, '#d9591a']]), 1.3);
+        rr(g, -5, -4.5, 9, 9, 3); fillOut(g, 'rgba(70,25,5,.55)', .8);
+        g.restore();
+        if (sw) { // little trimming flecks
+          g.fillStyle = 'rgba(190,240,120,.85)';
+          for (let i = 0; i < 4; i++) { const a2 = ang + (i - 1.5) * .09, r2 = 56 + ((u * 40 + i * 9) % 14); g.beginPath(); g.arc(H0[0] + Math.cos(a2) * r2, H0[1] + Math.sin(a2) * r2, 1.3, 0, TAU); g.fill(); }
+        }
+      };
       const front = sa >= -0.1;
-      if (!front) { scythe(); kidLegs(g, S); kidTorso(g, S); kidHead(g, S); kidArms(g, S, hands); }
+      if (trim) { if (!front) { trimmers(); kidLegs(g, S); kidTorso(g, S); kidHead(g, S); kidArms(g, S, hands); } else { kidLegs(g, S); kidTorso(g, S); kidHead(g, S); trimmers(); kidArms(g, S, hands); } }
+      else if (!front) { scythe(); kidLegs(g, S); kidTorso(g, S); kidHead(g, S); kidArms(g, S, hands); }
       else { kidLegs(g, S); kidTorso(g, S); kidHead(g, S); scythe(); kidArms(g, S, hands); }
       status(g, S, base);
     }

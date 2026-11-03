@@ -42,11 +42,38 @@
     g.drawImage(img,col*sw,row*sh,sw,sh,x-w*ax,y-h*ay,w,h);
   }
   function facing(h) { return ((Math.round(h/(Math.PI/4))%8)+8)%8; }
+  /* garden trimmers (hand shears): two crossed blades, red-orange ring handles, snipping open/closed */
+  function drawTrimmers(g,s,t) {
+    const p=s.p,sw=s.sw,plan=sw||s.aimPlan,aim=plan?(sw?sw.a0:plan.angle):(p.aimHeading??p.heading);
+    const half=.3,u=sw?Math.min(1,sw.t/sw.dur):0,a=sw?aim-half+2*half*u:aim;
+    const open=sw?.36*(1-u)*(1-u)+.02:.2;            // blades snap shut over the swing, rest slightly open
+    const hand=[p.x*C+Math.cos(p.heading)*1.1,p.y*C-4.8];
+    const px=3.4,L=8.2;
+    g.save();g.translate(hand[0],hand[1]);g.rotate(a);
+    g.fillStyle='rgba(24,30,20,.16)';g.beginPath();g.ellipse(px+L*.45+.3,.7,L*.55,.9,0,0,TAU);g.fill();
+    for(const side of [1,-1]){
+      g.save();g.translate(px,0);g.rotate(side*open);
+      // handle bar + ring, behind the pivot
+      g.strokeStyle='#8f3a1c';g.lineWidth=.62;g.lineCap='round';g.beginPath();g.moveTo(0,0);g.lineTo(-px+.6,side*.15);g.stroke();
+      g.strokeStyle='#e0612f';g.lineWidth=.42;g.beginPath();g.moveTo(0,0);g.lineTo(-px+.6,side*.15);g.stroke();
+      g.strokeStyle='#8f3a1c';g.lineWidth=.62;g.beginPath();g.ellipse(-px-.35,side*.55,1.1,.75,0,0,TAU);g.stroke();
+      g.strokeStyle='#e0612f';g.lineWidth=.38;g.beginPath();g.ellipse(-px-.35,side*.55,1.1,.75,0,0,TAU);g.stroke();
+      // blade: slim leaf from the pivot to a fine tip, on the opposite side of the cross
+      g.rotate(-side*open*2);
+      g.beginPath();g.moveTo(-.5,-.5*side);g.quadraticCurveTo(L*.55,-.75*side,L,0);g.quadraticCurveTo(L*.5,.18*side,-.5,.4*side);g.closePath();
+      g.fillStyle=side>0?'#e4eaef':'#bcc6cf';g.fill();g.strokeStyle='rgba(40,48,52,.5)';g.lineWidth=.09;g.stroke();
+      g.restore();
+    }
+    g.fillStyle='#6c747d';g.beginPath();g.arc(px,0,.32,0,TAU);g.fill();   // pivot screw
+    g.restore();
+    if(sw&&u>.55){g.fillStyle='rgba(190,240,120,.85)';const tip=[hand[0]+Math.cos(a)*(px+L),hand[1]+Math.sin(a)*(px+L)];for(let i=0;i<3;i++){g.beginPath();g.arc(tip[0]+(i-1)*.7,tip[1]+((u*20+i*1.7)%1.6),.26,0,TAU);g.fill();}}
+  }
   function drawScythe(g,s,t) {
+    if(s.sw?s.sw.snip:s.trim)return drawTrimmers(g,s,t);
     const p=s.p,sw=s.sw,sp=M.SCYTHE;
     const plan=sw||s.aimPlan,half=plan&&plan.halfArc!==undefined?plan.halfArc:sp.halfArc;
     const aim=plan?(sw?sw.a0:plan.angle):(p.aimHeading??p.heading);
-    const a=sw?aim-half+2*half*Math.min(1,sw.t/sp.duration):aim+half;
+    const a=sw?aim-half+2*half*Math.min(1,sw.t/(sw.dur||sp.duration)):aim+half;
     const x=p.x*C,y=p.y*C,R=(plan&&plan.reach||s.ts.width*.95)*C;
     const cx=Math.cos(a),cy=Math.sin(a),tx=-cy,ty=cx;
     const end=[x+cx*(R-.5),y+cy*(R-.5)];
