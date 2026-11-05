@@ -462,7 +462,7 @@
     if (SP && s.tool !== 'fertilizer') {
       const p = s.p, f = C / 48;
       g.save(); g.translate(p.x * C, p.y * C); g.scale(f, f);
-      SP.drawPlayer(g, { tool: s.ts.id, reach: s.ts.width * .95 * 48, heading: s.ts.id === 'scythe' ? (p.aimHeading !== undefined ? p.aimHeading : p.heading) : p.heading, step: p.step, moving: s.moving, swing: s.sw ? { a0: s.sw.a0, t: s.sw.t, dur: s.sw.dur, half: s.sw.snip ? .35 : s.sw.halfArc } : null, trim: !!(s.sw ? s.sw.snip : s.trim), engine: !!s.engine, cutting: !!s.cutting, stall: s.stall, tired: !!s.tired, t });
+      SP.drawPlayer(g, { tool: s.ts.id === 'trimmer' ? 'scythe' : s.ts.id, reach: s.ts.width * .95 * 48, heading: s.ts.id === 'scythe' ? (p.aimHeading !== undefined ? p.aimHeading : p.heading) : p.heading, step: p.step, moving: s.moving, swing: s.sw ? { a0: s.sw.a0, t: s.sw.t, dur: s.sw.dur, half: s.sw.snip ? .35 : s.sw.halfArc } : null, trim: !!(s.sw ? s.sw.snip : s.trim), engine: !!s.engine, cutting: !!s.cutting, stall: s.stall, tired: !!s.tired, t });
       g.restore(); return;
     }
     const p = s.p, Tl = s.ts, X = p.x * C, Y = p.y * C, h = p.heading;
@@ -600,7 +600,7 @@
       g.fillStyle = danger ? 'rgba(240,100,70,.16)' : (plan.snip ? 'rgba(130,200,255,.14)' : 'rgba(255,255,255,.07)');
       g.beginPath(); g.moveTo(X, Y); g.arc(X, Y, R, h - spread, h + spread); g.closePath(); g.fill(); g.stroke();
     } else {
-      const h = p.heading;
+      const h = Tl.id === 'trimmer' && s.sw ? s.sw.a0 : p.heading;
       g.setLineDash([1.6, 1.4]); g.lineWidth = 0.35; g.strokeStyle = 'rgba(255,255,255,.55)'; g.fillStyle = 'rgba(255,255,255,.07)';
       const reach = (Tl.r + 0.35) * C, half = Tl.width * 0.5 * C, depth = Tl.cutDepth * C;
       g.translate(X, Y); g.rotate(h); g.beginPath(); g.rect(reach - depth, -half, depth * 2, half * 2); g.fill(); g.stroke();

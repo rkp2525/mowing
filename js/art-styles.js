@@ -44,12 +44,12 @@
   function facing(h) { return ((Math.round(h/(Math.PI/4))%8)+8)%8; }
   /* garden trimmers (hand shears): two crossed blades, red-orange ring handles, snipping open/closed */
   function drawTrimmers(g,s,t) {
-    const p=s.p,sw=s.sw,plan=sw||s.aimPlan,aim=plan?(sw?sw.a0:plan.angle):(p.aimHeading??p.heading);
+    const p=s.p,sw=s.sw,plan=sw||s.aimPlan,aim=plan?(sw?sw.a0:plan.angle):(s.tool==='trimmer'?p.heading:(p.aimHeading??p.heading));
     const half=.3,u=sw?Math.min(1,sw.t/sw.dur):0,a=sw?aim-half+2*half*u:aim;
     const open=sw?.36*(1-u)*(1-u)+.02:.2;            // blades snap shut over the swing, rest slightly open
     const hand=[p.x*C+Math.cos(p.heading)*1.1,p.y*C-4.8];
-    const px=3.4,L=8.2;
-    g.save();g.translate(hand[0],hand[1]);g.rotate(a);
+    const px=3.4,L=8.2,unit=s.tool==='trimmer'?.55:1;
+    g.save();g.translate(hand[0],hand[1]);g.rotate(a);g.scale(unit,unit);
     g.fillStyle='rgba(24,30,20,.16)';g.beginPath();g.ellipse(px+L*.45+.3,.7,L*.55,.9,0,0,TAU);g.fill();
     for(const side of [1,-1]){
       g.save();g.translate(px,0);g.rotate(side*open);
@@ -66,7 +66,7 @@
     }
     g.fillStyle='#6c747d';g.beginPath();g.arc(px,0,.32,0,TAU);g.fill();   // pivot screw
     g.restore();
-    if(sw&&u>.55){g.fillStyle='rgba(190,240,120,.85)';const tip=[hand[0]+Math.cos(a)*(px+L),hand[1]+Math.sin(a)*(px+L)];for(let i=0;i<3;i++){g.beginPath();g.arc(tip[0]+(i-1)*.7,tip[1]+((u*20+i*1.7)%1.6),.26,0,TAU);g.fill();}}
+    if(sw&&u>.55){g.fillStyle='rgba(190,240,120,.85)';const tip=[hand[0]+Math.cos(a)*(px+L)*unit,hand[1]+Math.sin(a)*(px+L)*unit];for(let i=0;i<3;i++){g.beginPath();g.arc(tip[0]+(i-1)*.7,tip[1]+((u*20+i*1.7)%1.6),.26,0,TAU);g.fill();}}
   }
   function drawScythe(g,s,t) {
     if(s.sw?s.sw.snip:s.trim)return drawTrimmers(g,s,t);
@@ -96,7 +96,7 @@
     const row=tool==='ride'?3:s.moving?1+(Math.floor(p.step*1.5)&1):0;
     const behind=s.sw?Math.sin(s.sw.a0)<0:Math.sin((s.aimPlan?s.aimPlan.angle:(p.aimHeading??h))+(s.aimPlan?s.aimPlan.halfArc:M.SCYTHE.halfArc))<0;
     if(tool==='scythe'&&behind)drawScythe(g,s,t);
-    if(tool!=='scythe' && tool!=='fertilizer'){
+    if(tool!=='scythe' && tool!=='fertilizer' && tool!=='trimmer'){
       const gear=images.get(active+'-equipment'),r=tool==='reel'?0:tool==='gas'?1:2;
       const reach=tool==='ride'?0:(s.ts.r+.35)*C;
       const deckRatio={pixel:{reel:.54296875,gas:.47265625,ride:.76},realism:{reel:.4921875,gas:.421875,ride:.76}};
@@ -122,6 +122,7 @@
     const rider=tool==='ride';
     frame(g,image,8,4,dir,row,x-(rider?Math.cos(h)*3.2:0),y-bob-(rider?4+Math.sin(h)*1.8:0),14,14,.5,rider?.68:.90);
     if(tool==='scythe'&&!behind)drawScythe(g,s,t);
+    if(tool==='trimmer')drawTrimmers(g,s,t);
     if(tool==='fertilizer'){ rect(g,x+1.4,y-4.8,2.8,3.7,'#d7c392'); line(g,x+1.6,y-4.5,x+4,y-4.5,'#ece0b4',.3); ellipse(g,x+2.8,y-2.8,.6,.85,'#73965b'); }
     if(s.stall>0){ellipse(g,x,y-13,.5,.5,'#f4cf66');line(g,x,y-16,x,y-14,'#f4cf66',.7);}
     if(s.tired){ellipse(g,x+2.2,y-10,.35,.65,'#9bc9cf');}
