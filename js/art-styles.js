@@ -96,7 +96,7 @@
     const row=tool==='ride'?3:s.moving?1+(Math.floor(p.step*1.5)&1):0;
     const behind=s.sw?Math.sin(s.sw.a0)<0:Math.sin((s.aimPlan?s.aimPlan.angle:(p.aimHeading??h))+(s.aimPlan?s.aimPlan.halfArc:M.SCYTHE.halfArc))<0;
     if(tool==='scythe'&&behind)drawScythe(g,s,t);
-    if(tool!=='scythe'){
+    if(tool!=='scythe' && tool!=='fertilizer'){
       const gear=images.get(active+'-equipment'),r=tool==='reel'?0:tool==='gas'?1:2;
       const reach=tool==='ride'?0:(s.ts.r+.35)*C;
       const deckRatio={pixel:{reel:.54296875,gas:.47265625,ride:.76},realism:{reel:.4921875,gas:.421875,ride:.76}};
@@ -122,6 +122,7 @@
     const rider=tool==='ride';
     frame(g,image,8,4,dir,row,x-(rider?Math.cos(h)*3.2:0),y-bob-(rider?4+Math.sin(h)*1.8:0),14,14,.5,rider?.68:.90);
     if(tool==='scythe'&&!behind)drawScythe(g,s,t);
+    if(tool==='fertilizer'){ rect(g,x+1.4,y-4.8,2.8,3.7,'#d7c392'); line(g,x+1.6,y-4.5,x+4,y-4.5,'#ece0b4',.3); ellipse(g,x+2.8,y-2.8,.6,.85,'#73965b'); }
     if(s.stall>0){ellipse(g,x,y-13,.5,.5,'#f4cf66');line(g,x,y-16,x,y-14,'#f4cf66',.7);}
     if(s.tired){ellipse(g,x+2.2,y-10,.35,.65,'#9bc9cf');}
     g.restore();return true;
@@ -261,6 +262,7 @@
       const tuft=grass(s.vr[i]&7,P,s.grass[i]>1,M.Sim.grassPattern(s,i));g.drawImage(tuft,Math.round(x*k-ox)-tuft._pad,Math.round(y*k-oy)-tuft._top);
     }
     g.setTransform(u,0,0,u,-ox,-oy);
+    M.Groundskeeping.draw(g,s);
     for(const f of s.fences||[])fence(g,f);
     if(opts.footprint!==false)M.Render.drawFootprint(g,s);
     drawTruck(g,s);

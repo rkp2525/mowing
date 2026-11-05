@@ -5,7 +5,7 @@ A cozy top-down lawn mowing game. Start as a kid with a free, quiet reel mower, 
 ## Play
 - **Desktop app:** double-click `Lawn Kid.app` (opens in its own window via Chrome; falls back to your default browser). Or just open `index.html`.
 - **Phone / friends:** deploy this folder to Vercel (`npx vercel --prod`) — it is a plain static site, no build step.
-- Controls: WASD/arrows or hold the left mouse button to steer · **Alt** = creep · **Shift / L / ↔ button = straight-line lock** · Q/E switch mower · +/− zoom · Esc pause. Touch: drag to steer. Mowers cut as you move.
+- Controls: WASD/arrows or hold the left mouse button to steer · **Alt** = creep · **Shift / L / ↔ button = straight-line lock** · Q/E change equipment at the truck · Space scatters fertilizer · +/− zoom · Esc pause. Touch: drag to steer. Mowers cut as you move.
 
 ## Game layers (the foundation for a bigger game)
 - **Tools:** free reel mower → gas mower → riding mower (speed, width, power, turn radius, fuel).
@@ -56,3 +56,13 @@ Each flower patch has 21 independently clippable stems, shared by both art style
 Rocks are solid round obstacles with no bounce, steering change, stall, extra fuel cost, care loss, or cash deduction. Existing saves retain progress and purchased mowers, receive the reel mower, and switch away from retired equipment automatically.
 
 Mown grass uses consistent green shades by travel direction: north/east are lighter, south/west are darker. Each mowing sample remembers its direction, so opposite passes create stripes and re-crossing a stripe only bends blades beneath the deck. Re-crossing cut grass does not add coverage or pattern points.
+
+During a job, mower changes require returning to the truck (the same area used for refueling). A change is refused if the new mower would overlap a rock, tree, wall, or other solid obstacle; the current mower and saved selection remain unchanged.
+
+## Groundskeeping
+
+Every lawn includes two to five rough patches with pale grass and exposed soil. Mow a patch, return to the truck, click the equipment chip, and choose **Fertilizer**. Walk to the patch and press **Space** or tap **Scatter** once per handful. Holding the button never repeats the action. A soft circle previews the area around your feet; move across the patch to cover it.
+
+Fertilizer and refills are free. Only mown, untreated rough grass within reach receives feed; healthy lawn and flowers are unaffected. Fed grass greens up over five seconds. The HUD tracks feeding, and treatment earns a proportional bonus of up to 10% of the job's base rate. Groundskeeping is optional. The speed-rating clock freezes when the lawn reaches 97% mowed, so feeding afterward does not lower the mowing score. New jobs restore the original rough patches.
+
+`node tools/check-groundskeeping.js` checks patch placement across all ten lawns, truck-only equipment changes, manual local spreading, mowing requirements, growth, and flower safety. `tools/gentle-review.html` compares flowers, stripes, and rough-patch restoration in both production renderers.

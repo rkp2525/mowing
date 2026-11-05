@@ -18,7 +18,7 @@
 
   <div id="hud" class="hidden">
     <div class="hud-top">
-      <button id="hud-tool" class="chip tool-chip" title="Switch tool (Q)"><span id="hud-tool-icon">🛞</span><span id="hud-tool-name">Push Reel Mower</span></button>
+      <button id="hud-tool" class="chip tool-chip" title="Truck equipment (Q/E)"><span id="hud-tool-icon">🛞</span><span id="hud-tool-name">Push Reel Mower</span></button>
       <div class="cov-wrap">
         <div class="cov-bar"><div id="cov-fill"></div><div class="cov-mark" style="left:80%"></div></div>
         <div class="cov-text"><span id="cov-pct">0%</span> mowed · <span id="cov-time">0:00</span></div>
@@ -31,6 +31,8 @@
       </div>
     </div>
     <div class="meter-wrap"><div class="meter-label" id="meter-label">Stamina</div><div class="meter"><div id="meter-fill"></div></div></div>
+    <div id="grounds-status" class="chip grounds-status" role="status"></div>
+    <button id="btn-fertilize" class="big-btn grounds-action hidden">Scatter · Space</button>
     <div id="hint" class="hint hidden"></div>
     <button id="btn-finish" class="big-btn finish hidden">✔ Finish Job</button>
     <div id="touch-ui">
@@ -42,6 +44,7 @@
   <div id="toast" class="hidden"></div>
 </div>
 <script src="js/data.js"></script>
+<script src="js/groundskeeping.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/bot.js"></script>
 <script src="js/audio.js"></script>

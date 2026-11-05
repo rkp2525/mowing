@@ -121,3 +121,31 @@ test('Opposite passes make consistent shades and crossing a stripe changes only 
   assert.ok(patterns.some(g => g.direction === M.Sim.DIR.N));
   assert.ok(patterns.some(g => g.direction === M.Sim.DIR.S));
 });
+
+test('Mower changes require the truck and reject overlapping equipment without changing state', () => {
+  const s = lawn('reel');
+  s.p.x = s.lv.spawn.x + 6; s.p.y = s.lv.spawn.y;
+  s.fuel = 61; s.stamina = 73; s.p.speed = 2;
+  const snapshot = () => JSON.stringify({ tool: s.tool, stats: s.ts, fuel: s.fuel, stamina: s.stamina, speed: s.p.speed, used: s.toolsUsed });
+  let before = snapshot();
+  assert.equal(M.Sim.setTool(s, 'ride'), false); assert.equal(snapshot(), before);
+  // Reproduce the review's radius-growth trap, inside the truck area.
+  s.p.x = s.lv.spawn.x; s.p.y = s.lv.spawn.y;
+  s.ents = [{ t: 'rock', x: s.p.x + 1.1, y: s.p.y, alive: true }];
+  assert.equal(M.Sim.collides(s, s.p.x, s.p.y, s.ts.r), false);
+  before = snapshot();
+  assert.equal(M.Sim.setTool(s, 'ride'), false); assert.equal(snapshot(), before);
+  // Walls must reject oversized equipment too.
+  s.ents = []; s.p.x = Math.floor(s.p.x) + .4;
+  s.type[Math.floor(s.p.y) * s.W + Math.floor(s.p.x) + 1] = M.T.HOUSE;
+  before = snapshot();
+  assert.equal(M.Sim.setTool(s, 'ride'), false); assert.equal(snapshot(), before);
+  s.type.fill(M.T.GRASS);
+  assert.equal(M.Sim.setTool(s, 'ride'), true); assert.equal(s.tool, 'ride');
+  assert.equal(s.p.speed, 0); assert.equal(s.fuel, 61); assert.ok(s.toolsUsed.ride);
+  // Being just outside the truck area cannot allow a smaller mower either.
+  s.p.x = s.lv.spawn.x + 3.61;
+  before = snapshot(); assert.equal(M.Sim.setTool(s, 'reel'), false); assert.equal(snapshot(), before);
+  s.p.x = s.lv.spawn.x + 3.59;
+  assert.equal(M.Sim.setTool(s, 'reel'), true);
+});

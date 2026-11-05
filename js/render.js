@@ -459,7 +459,7 @@
   function drawPlayer(g, s, t) {
     if (M.ArtStyles && M.ArtStyles.drawPlayer(g, s, t)) return;
     const SP = M.SpritesPlayer;
-    if (SP) {
+    if (SP && s.tool !== 'fertilizer') {
       const p = s.p, f = C / 48;
       g.save(); g.translate(p.x * C, p.y * C); g.scale(f, f);
       SP.drawPlayer(g, { tool: s.ts.id, reach: s.ts.width * .95 * 48, heading: s.ts.id === 'scythe' ? (p.aimHeading !== undefined ? p.aimHeading : p.heading) : p.heading, step: p.step, moving: s.moving, swing: s.sw ? { a0: s.sw.a0, t: s.sw.t, dur: s.sw.dur, half: s.sw.snip ? .35 : s.sw.halfArc } : null, trim: !!(s.sw ? s.sw.snip : s.trim), engine: !!s.engine, cutting: !!s.cutting, stall: s.stall, tired: !!s.tired, t });
@@ -467,6 +467,7 @@
     }
     const p = s.p, Tl = s.ts, X = p.x * C, Y = p.y * C, h = p.heading;
     const bob = s.moving ? Math.sin(p.step * 2.2) : 0;
+    if (s.tool === 'fertilizer') { drawKid(g, X, Y, h, bob, false); g.fillStyle = '#d8c490'; g.fillRect(X + 2, Y - 4, 3, 4); return; }
     const stalled = s.stall > 0;
     if (Tl.id === 'ride') {
       shadow(g, X + 2, Y + 5, 15, 9, 0.34);
@@ -573,7 +574,10 @@
     // during a swing the arc is planted at the swing origin; idle previews follow the player
     const X = (s.sw && s.sw.ox !== undefined ? s.sw.ox : p.x) * C, Y = (s.sw && s.sw.oy !== undefined ? s.sw.oy : p.y) * C;
     g.save();
-    if (Tl.id === 'scythe') {
+    if (Tl.id === 'fertilizer') {
+      g.setLineDash([1, 1.4]); g.lineWidth = .25; g.strokeStyle = 'rgba(239,226,183,.55)';
+      g.beginPath(); g.arc(X, Y, 1.05 * C, 0, TAU); g.stroke();
+    } else if (Tl.id === 'scythe') {
       const plan = s.sw || s.aimPlan; if (!plan) { g.restore(); return; }
       const h = s.sw ? s.sw.a0 : plan.angle, R = plan.reach * C, spread = plan.halfArc + (plan.blade !== undefined ? plan.blade : M.SCYTHE.bladeAngle);
       const wd = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -639,6 +643,7 @@
     }
 
     ctx.setTransform(u, 0, 0, u, -ox, -oy);
+    M.Groundskeeping.draw(ctx, s);
     ctx.lineCap = 'round';
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const kd = s.kind[y * s.W + x]; if (kd !== K.WATER && kd !== K.WATERE) continue;

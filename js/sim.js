@@ -11,7 +11,7 @@
 
   /* Compute tool stats modified by upgrades. */
   function toolStats(toolId, save) {
-    toolId = M.TOOL_ORDER.includes(toolId) ? toolId : 'reel';
+    toolId = M.EQUIPMENT_ORDER.includes(toolId) ? toolId : 'reel';
     const T = M.TOOLS[toolId];
     const b = upgradeLv(save, 'blades'), bo = upgradeLv(save, 'boots'), tk = upgradeLv(save, 'tank'), st = upgradeLv(save, 'steer');
     return {
@@ -34,10 +34,11 @@
     const s = {
       lv, W: lv.W, H: lv.H, type: lv.type,
       grass: new Uint8Array(n), subGrass: new Uint8Array(n * M.GRASS_SUBDIV ** 2), subRemaining: new Uint8Array(n), protected: lv.protected, dir: new Uint8Array(n), subDir: new Uint8Array(n * M.GRASS_SUBDIV ** 2), stripePatterns: new Array(n),
+      roughPatches: M.Groundskeeping.create(lv), spreadCool: 0,
       dirty: [], remaining: 0, total: lv.total,
       ents: lv.ents.map((e) => Object.assign({}, e, { alive: true, found: false, cd: 0, ...(e.t === 'flower' ? { stems: M.flowerStems(e) } : {}) })),
       p: { x: lv.spawn.x, y: lv.spawn.y, heading: -Math.PI / 2, aimHeading: -Math.PI / 2, speed: 0, step: 0 },
-      time: 0, started: false, done: false,
+      time: 0, mowingFinishedAt: null, started: false, done: false,
       stall: 0, sw: null, swCool: 0, tired: false, stamina: 100, fuel: 100,
       eyes: upgradeLv(save, 'eyes'), cards: upgradeLv(save, 'cards'),
       save: save || {}, cutH: 0, cutV: 0, powerCut: 0,
@@ -59,14 +60,23 @@
     return s;
   }
 
+  function atTruck(s) {
+    return Math.hypot(s.p.x - s.lv.spawn.x, s.p.y - s.lv.spawn.y) < 3.6;
+  }
+
   function setTool(s, toolId) {
-    toolId = M.TOOL_ORDER.includes(toolId) ? toolId : 'reel';
-    const old = s.ts;
-    s.tool = toolId; s.ts = toolStats(toolId, s.save);
+    toolId = M.EQUIPMENT_ORDER.includes(toolId) ? toolId : 'reel';
+    const old = s.ts, next = toolStats(toolId, s.save);
+    if (old && old.id === toolId) return true;
+    // Initial job selection happens at spawn. Later swaps require a safe place at the truck.
+    if (old && (!atTruck(s) || collides(s, s.p.x, s.p.y, next.r))) return false;
+    s.tool = toolId; s.ts = next;
+    s.p.speed = 0;
     s.toolsUsed[toolId] = true;
-    s.sw = null; s.aimPlan = null;
+    s.sw = null; s.aimPlan = null; s.actWasDown = false;
     s.fuel = old ? Math.min(s.fuel, s.ts.fuelMax) : s.ts.fuelMax;
     s.stamina = Math.min(s.stamina, s.ts.staminaMax);
+    return true;
   }
 
   function blockedCell(s, cx, cy) {
@@ -185,7 +195,7 @@
 
     const fuelOut = T.powered && s.fuel <= 0;
     // The body always faces travel. Scythe aiming is separate and assisted.
-    const onFoot = T.id === 'scythe';
+    const onFoot = T.id === 'scythe' || T.id === 'fertilizer';
     if (ta !== null) {
       const d=angDiff(p.heading,ta),maxTurn=T.turn*dt;
       p.heading=onFoot?ta:p.heading+clamp(d,-maxTurn,maxTurn);
@@ -222,7 +232,7 @@
     s.moving = p.speed > 0.4;
 
     // ---- refuel / rest at the truck
-    const nearTruck = Math.hypot(p.x - s.lv.spawn.x, p.y - s.lv.spawn.y) < 3.6;
+    const nearTruck = atTruck(s);
     if (T.powered && nearTruck && p.speed < 2.5 && (s.refueling ? s.fuel < T.fuelMax - 0.1 : s.fuel < T.fuelMax * 0.9)) {
       if (!s.refueling) { s.refueling = true; ev.push({ e: 'refuel' }); }
       s.fuel = Math.min(T.fuelMax, s.fuel + T.refuelRate * dt);
@@ -261,6 +271,13 @@
       } else {
         s.stamina = Math.min(T.staminaMax, s.stamina + T.staminaRegen * dt);
         if (s.tired && s.stamina > T.staminaMax * 0.3) s.tired = false;
+      }
+    } else if (T.id === 'fertilizer') {
+      s.spreadCool = Math.max(0, s.spreadCool - dt);
+      if (pressed && s.spreadCool <= 0) {
+        s.spreadCool = .35;
+        const result = M.Groundskeeping.spread(s);
+        ev.push({ e: 'fertilize', x: p.x, y: p.y, ...result });
       }
     } else if (T.powered) {
       engineOn = !fuelOut && s.stall <= 0;
@@ -317,6 +334,8 @@
       }
     } else for (const e of s.ents) if (e.cd > 0) e.cd -= dt;
 
+    if (s.mowingFinishedAt === null && coverage(s) >= .97) s.mowingFinishedAt = s.time;
+    M.Groundskeeping.step(s, dt);
     if (cutN) { ev.push({ e: 'cut', n: cutN, x: p.x + hx, y: p.y + hy }); s.powerCut += cutN; }
     if (s.remaining <= 0 && !s.allCutNoted) { s.allCutNoted = true; ev.push({ e: 'allcut' }); }
     return ev;
@@ -356,7 +375,8 @@
     const pattern = clamp((dom - 0.55) / 0.4, 0, 1);
     const dmgPoints = s.flowersLost * 0.14 + s.gnomesBroken * 0.18 + s.toysChopped * 0.08;
     const care = clamp(1 - dmgPoints, 0, 1);
-    const speed = clamp(def.par / Math.max(1, s.time) , 0, 1);
+    const mowingTime = s.mowingFinishedAt ?? s.time;
+    const speed = clamp(def.par / Math.max(1, mowingTime), 0, 1);
     const sc = 0.5 * covN + 0.18 * pattern + 0.17 * care + 0.15 * speed;
     let stars = sc >= 0.92 ? 5 : sc >= 0.78 ? 4 : sc >= 0.6 ? 3 : sc >= 0.42 ? 2 : 1;
     if (cov < 0.8) stars = 0;
@@ -364,10 +384,12 @@
     const bonusGnome = s.gnomesFound * (3 + def.id);
     const bonusToy = s.toysFound * Math.ceil(1 + def.id * 0.4);
     const fines = Math.round((s.flowersLost * 0.03) * def.pay);
+    const grounds = M.Groundskeeping.progress(s);
+    const bonusGrounds = Math.round(grounds.fraction * s.lv.def.pay * .10);
     const mult = 1 + 0.08 * s.cards;
-    const pay = Math.max(0, Math.round((payBase + bonusGnome + bonusToy) * mult - fines));
-    return { cov, covN, pattern, care, speed, score: sc, stars, payBase: Math.round(payBase), bonusGnome, bonusToy, fines, cardsMult: mult, pay, time: s.time };
+    const pay = Math.max(0, Math.round((payBase + bonusGnome + bonusToy + bonusGrounds) * mult - fines));
+    return { cov, covN, pattern, care, speed, score: sc, stars, payBase: Math.round(payBase), bonusGnome, bonusToy, bonusGrounds, grounds, fines, cardsMult: mult, pay, time: s.time, mowingTime };
   }
 
-  M.Sim = { create, step, setTool, coverage, score, toolStats, collides, DIR, dirCode, upgradeLv, blockedCell, scytheMode, makeFootprint, grassPattern, stripePatterns };
+  M.Sim = { create, step, setTool, atTruck, coverage, score, toolStats, collides, DIR, dirCode, upgradeLv, blockedCell, scytheMode, makeFootprint, grassPattern, stripePatterns };
 })();

@@ -56,6 +56,13 @@
     },
   };
 
+  M.TOOLS.fertilizer = {
+    id: 'fertilizer', name: 'Fertilizer', icon: '🌱', price: 0, powered: false,
+    speed: 3.8, turn: 16, accel: 18, decel: 40, power: 0, width: 0, r: .35,
+    desc: 'A bag of lawn feed. Walk to mown rough patches and scatter a handful.',
+  };
+  M.EQUIPMENT_ORDER = [...M.TOOL_ORDER, 'fertilizer'];
+
   // Retired equipment is kept for future experiments, outside the playable tools.
   M.RETIRED_TOOLS = {
     scythe: {

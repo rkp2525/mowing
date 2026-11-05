@@ -143,3 +143,10 @@ body.touch .finish.ready { animation: none; }
 .snip-btn:active, .snip-btn.down { transform: translateY(3px); box-shadow: 0 2px 0 #2f6e96; }
 
 .snip-btn.on { background: rgba(40, 110, 170, 1); outline: 3px solid rgba(255,255,255,.85); }
+
+/* Truck equipment and optional lawn feeding. */
+.truck-tools { display: grid; gap: 12px; margin: 16px 0; }
+.grounds-status { position: absolute; left: 16px; top: 60px; font-size: 13px; pointer-events: none; }
+.grounds-action { position: absolute; right: 18px; bottom: calc(26px + env(safe-area-inset-bottom)); }
+body.touch .grounds-action { width: 110px; min-height: 76px; font-size: 16px; }
+@media (max-width: 600px) { .grounds-status { top: 108px; left: 12px; font-size: 12px; } }
