@@ -13,17 +13,31 @@
   M.T = { VOID: 0, GRASS: 1, PATH: 2, HOUSE: 3, WATER: 4, SAND: 5, TREE: 6, HEDGE: 7 };
   M.BLOCKED = [1, 0, 0, 1, 1, 1, 1, 1]; // indexed by type
 
+  // Opposite travel lays the blades in opposite directions: two consistent greens.
+  M.MOWN_COLORS = { light: '#81b967', dark: '#70a558' };
+  M.stripeLight = direction => direction === 1 || direction === 4; // east / north
+  M.ROCK_RADIUS = .55;
+  M.FLOWER_SCALE = .28;
+  M.flowerStems = function (e) {
+    const stems = [];
+    for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) {
+      if (x * x + y * y > 5) continue;
+      const jitter = Math.sin(e.x * 17 + e.y * 31 + x * 13 + y * 7) * .025;
+      stems.push({ x: e.x + x * .18 + jitter, y: e.y + y * .18 - jitter, clipped: false });
+    }
+    return stems;
+  };
+  M.normalizeEquipment = function (save) {
+    save.tools = Object.fromEntries(M.TOOL_ORDER.filter(id => id === 'reel' || save.tools?.[id]).map(id => [id, true]));
+    if (!M.TOOL_ORDER.includes(save.tool) || !save.tools[save.tool]) save.tool = 'reel';
+    return save;
+  };
+
   /* ---------- Tools ---------- */
-  M.TOOL_ORDER = ['scythe', 'reel', 'gas', 'ride'];
+  M.TOOL_ORDER = ['reel', 'gas', 'ride'];
   M.TOOLS = {
-    scythe: {
-      id: 'scythe', name: 'Old Scythe', icon: '🌾', price: 0, powered: false,
-      speed: 3.0, turn: 16, accel: 16, decel: 40, power: 1, width: 2.6, r: 0.45,
-      desc: 'Grandpa’s scythe. Swing it to snip grass in an arc. Tires you out.',
-      stats: { Speed: 2, Reach: 1, Power: 1, Comfort: 1 },
-    },
     reel: {
-      id: 'reel', name: 'Push Reel Mower', icon: '🛞', price: 40, powered: false,
+      id: 'reel', name: 'Push Reel Mower', icon: '🛞', price: 0, powered: false,
       speed: 4.8, turn: 14, accel: 30, decel: 40, power: 1, width: 1.4, cutDepth: .30, r: 0.5,
       desc: 'Quiet, tidy, no fuel. Leaves lovely little stripes.',
       stats: { Speed: 3, Reach: 2, Power: 1, Comfort: 3 },
@@ -39,6 +53,16 @@
       speed: 8.6, turn: 3.9, accel: 7, decel: 10, power: 2, width: 2.6, cutDepth: .55, r: 1.0,
       desc: 'Wide deck, big engine, wide turns. The dream machine.',
       stats: { Speed: 5, Reach: 5, Power: 3, Comfort: 5 },
+    },
+  };
+
+  // Retired equipment is kept for future experiments, outside the playable tools.
+  M.RETIRED_TOOLS = {
+    scythe: {
+      id: 'scythe', name: 'Old Scythe', icon: '🌾', price: 0, powered: false,
+      speed: 3.0, turn: 16, accel: 16, decel: 40, power: 1, width: 2.6, r: 0.45,
+      desc: 'Grandpa’s scythe. Swing it to snip grass in an arc. Tires you out.',
+      stats: { Speed: 2, Reach: 1, Power: 1, Comfort: 1 },
     },
   };
 
@@ -116,8 +140,8 @@
   L.push({
     id: 1, name: 'Mrs. Albright’s Front Yard', owner: 'Mrs. Albright', emoji: '👵',
     quote: '“Oh, you dear! Just the front lawn, please. Mind my tulips!”',
-    tip: 'Hold the trackpad click and slide to move, or use WASD. The scythe aims at your cursor. SPACE sweeps. Press C for the trimmers, then SPACE trims precisely around flowers and rocks.',
-    w: 22, h: 15, pay: 22, par: 95, rec: 'scythe', fence: 'picket', theme: 0,
+    tip: 'Hold and slide to steer, or use WASD. Your reel mower cuts as you move. Gently edge around flowers; rocks are simply obstacles.',
+    w: 22, h: 15, pay: 22, par: 95, rec: 'reel', fence: 'picket', theme: 0,
     build(B) {
       B.rect(0, 0, 22, 15, '.'); B.rect(0, 0, 22, 3, 'H');
       B.rect(10, 3, 2, 12, 'p'); B.spawn(10, 13);
@@ -131,7 +155,7 @@
     id: 2, name: 'The Pattersons’', owner: 'Mr. Patterson', emoji: '👨‍🍳',
     quote: '“Kid, I’ll pay extra if the yard looks like a ballpark.”',
     tip: 'Mow in straight, back-and-forth lines for neat stripes — stripes boost your pay!',
-    w: 26, h: 18, pay: 32, par: 120, rec: 'scythe', fence: 'picket', theme: 1,
+    w: 26, h: 18, pay: 32, par: 120, rec: 'reel', fence: 'picket', theme: 1,
     build(B) {
       B.rect(0, 0, 26, 18, '.'); B.rect(0, 0, 11, 5, 'H');
       B.rect(4, 5, 2, 13, 'p'); B.spawn(4, 16);
@@ -146,7 +170,7 @@
   L.push({
     id: 3, name: 'Corner Lot on Maple', owner: 'The Nguyens', emoji: '🧑‍🌾',
     quote: '“We’re hosting a barbecue Saturday. Make it shine!”',
-    tip: 'Dark, thick grass takes two passes with a scythe or reel mower. Better mowers cut it in one.',
+    tip: 'Dark, thick grass takes two passes with a reel mower. Better mowers cut it in one.',
     w: 32, h: 24, pay: 46, par: 150, rec: 'reel', fence: 'hedge', theme: 2,
     build(B) {
       B.rect(0, 0, 32, 11, '.'); B.rect(0, 11, 14, 13, '.');

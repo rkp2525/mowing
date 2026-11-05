@@ -1,26 +1,39 @@
 #!/usr/bin/env node
-// Reachability audit through actual safe swings. Repositions the test operator
-// around each patch; this checks contracts/geometry, not bot pathfinding.
-const assert=require('node:assert/strict'),M=require('./load.js');
-const levels=process.argv.includes('--all')?M.LEVELS.map((_,i)=>i):[0,1];
-for(const l of levels){
- const s=M.Sim.create(l,{upgrades:{}},'scythe'),N=M.GRASS_SUBDIV;
- function swing(x,y){
-  if(M.Sim.collides(s,x,y,s.ts.r))return;
-  s.p.x=x;s.p.y=y;s.p.speed=0;s.aimPlan=null;s.aimTimer=0;s.stamina=s.ts.staminaMax;s.tired=false;
-  M.Sim.step(s,{mx:0,my:0,act:true},1/30);
-  for(let n=0;n<14;n++)M.Sim.step(s,{mx:0,my:0,act:false},1/30);
- }
- for(let pass=0;pass<3&&s.remaining;pass++){
-  const pending=[];for(let i=0;i<s.grass.length;i++)if(s.grass[i])pending.push(i);
-  for(const i of pending){
-   const x=i%s.W+.5,y=Math.floor(i/s.W)+.5;
-   for(const [dx,dy]of pass===0?[[0,0]]:[[0,0],[.2,0],[-.2,0],[0,.2],[0,-.2]]){
-    if(!s.grass[i])break;for(let n=0;n<3&&s.grass[i];n++)swing(x+dx,y+dy);
-   }
+// Check required mowing samples against real mower deck geometry, solid obstacles,
+// and intact flower stems. This audits reachability, independently of the demo bot.
+const assert = require('node:assert/strict'), M = require('./load.js');
+const levels = process.argv.includes('--all') ? M.LEVELS.map((_, i) => i) : [0, 1];
+const N = M.GRASS_SUBDIV, count = N * N;
+for (const level of levels) {
+  const s = M.Sim.create(level, {}, 'reel'), missing = [];
+  let checked = 0;
+  const reach = s.ts.r + .35, half = s.ts.width / 2;
+  for (let i = 0; i < s.grass.length; i++) {
+    if (!s.grass[i]) continue;
+    const cx = i % s.W, cy = Math.floor(i / s.W);
+    const flowers = s.ents.filter(e => e.t === 'flower' && Math.hypot(e.x - cx - .5, e.y - cy - .5) < 2.5);
+    const safe = (x, y) => {
+      for (let angle = 0; angle < 64; angle++) {
+        const heading = angle * Math.PI / 32, hx = Math.cos(heading), hy = Math.sin(heading);
+        for (const side of [0, -.5 * half, .5 * half, -.95 * half, .95 * half]) for (const depth of [0, -.95 * s.ts.cutDepth, .95 * s.ts.cutDepth]) {
+          s.p.x = x - hx * (reach + depth) + hy * side;
+          s.p.y = y - hy * (reach + depth) - hx * side;
+          s.p.heading = heading;
+          if (M.Sim.collides(s, s.p.x, s.p.y, s.ts.r)) continue;
+          const fp = M.Sim.makeFootprint(s);
+          if (!fp(x, y, 0)) continue;
+          if (flowers.some(e => e.stems.some(stem => fp(stem.x, stem.y, 0)))) continue;
+          return true;
+        }
+      }
+      return false;
+    };
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (!s.subGrass[i * count + y * N + x]) continue;
+      checked++;
+      if (!safe(cx + (x + .5) / N, cy + (y + .5) / N)) missing.push([cx + (x + .5) / N, cy + (y + .5) / N]);
+    }
   }
- }
- console.log(`Level ${l+1}: ${(M.Sim.coverage(s)*100).toFixed(4)}%, ${s.remaining} remaining, ${s.flowersLost} flowers lost, ${s.rockHits} rock hits`);
- if(s.remaining){const left=[];for(let i=0;i<s.grass.length;i++)if(s.grass[i])left.push({x:i%s.W-M.MARGIN,y:Math.floor(i/s.W)-M.MARGIN,samples:s.subRemaining[i]});console.log('Remaining patches:',JSON.stringify(left.slice(0,12)));}
- assert.equal(s.remaining,0,'All required grass must be safely cuttable');assert.equal(M.Sim.coverage(s),1);assert.equal(s.flowersLost,0);assert.equal(s.rockHits,0);
+  console.log(`Level ${level + 1}: ${checked} required samples; ${missing.length} unreachable without clipping flowers`);
+  assert.equal(missing.length, 0, JSON.stringify(missing.slice(0, 10)));
 }

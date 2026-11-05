@@ -146,11 +146,16 @@
         const img=images.get(cut?'realism-cut':'realism-grass');
         const side=Math.min(img.naturalWidth,img.naturalHeight)/2;
         const x=(v%2)*side,y=(Math.floor(v/2)%2)*side;
-        g.filter = cut ? 'saturate(.55) brightness(.93) contrast(.88)' : 'saturate(.65) brightness(.94)';
-        g.drawImage(img,x,y,side,side,0,0,P,P);
+        if (cut) {
+          rect(g,0,0,P,P,kind===13?M.MOWN_COLORS.light:M.MOWN_COLORS.dark);
+          g.globalAlpha = .12;
+        }
+        g.filter = cut ? 'saturate(.5) contrast(.7)' : 'saturate(.65) brightness(.94)';
+        g.drawImage(img,cut?0:x,cut?0:y,side,side,0,0,P,P);
+        g.globalAlpha = 1;
         g.filter = 'none';
         if(kind===0)rect(g,0,0,P,P,'rgba(19,42,26,.3)');
-        if(kind===13)rect(g,0,0,P,P,'rgba(233,226,130,.13)');
+
 
         break;
       }
@@ -216,8 +221,12 @@
       g.save();if(s&&Math.hypot(s.p.x-e.x,s.p.y-e.y)<(big?5:3.3)&&s.p.y<e.y+1.3)g.globalAlpha*=.35;
       frame(g,img,4,2,big?1:0,0,x,y+2,size,size,.5,.91);g.restore();
     }else if(e.t==='flower'){
-      const sway=Math.sin(t*1.3+x)*.15;
-      frame(g,img,4,2,e.color%4,1,x+sway,y+1,13,13,.5,.91);
+      for (const stem of e.stems || M.flowerStems(e)) {
+        const X = stem.x * C, Y = stem.y * C;
+        if (stem.clipped) { rect(g, X - .12, Y - .2, .24, .3, '#73925b'); continue; }
+        const sway = Math.sin(t * 1.3 + X) * .05;
+        frame(g,img,4,2,e.color%4,1,X+sway,Y+.28,13*M.FLOWER_SCALE,13*M.FLOWER_SCALE,.5,.91);
+      }
     }else if(e.t==='rock')frame(g,img,4,2,2,0,x,y+1,13,13,.5,.91);
     else if(e.t==='gnome'){
       if(e.found)return;
@@ -236,14 +245,16 @@
     g.setTransform(1,0,0,1,0,0);g.imageSmoothingEnabled=true;g.fillStyle='#344f35';g.fillRect(0,0,vw,vh);
     const x0=Math.max(0,Math.floor(cam.x/C)-1),y0=Math.max(0,Math.floor(cam.y/C)-2),x1=Math.min(s.W-1,Math.ceil((cam.x+vw/u)/C)+1),y1=Math.min(s.H-1,Math.ceil((cam.y+vh/u)/C)+2);
     for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
-      const i=y*s.W+x,kd=s.kind[i],v=s.vr[i],kind=kd===11&&s.grass[i]===0?((s.dir[i]===1||s.dir[i]===3)?13:12):kd;
+      const i=y*s.W+x,kd=s.kind[i],v=s.vr[i];
       const dx=Math.round(x*k-ox),dy=Math.round(y*k-oy),w=Math.round((x+1)*k-ox)-dx+1,h=Math.round((y+1)*k-oy)-dy+1;
       const partial=kd===11&&s.grass[i]>0&&s.subRemaining[i]<M.GRASS_SUBDIV**2;
-      if(partial){
-        g.drawImage(tile((s.dir[i]===1||s.dir[i]===3)?13:12,v&7,P),dx,dy,w,h);
-        const pattern=M.Sim.grassPattern(s,i),N=M.GRASS_SUBDIV;
-        g.save();g.beginPath();for(let yy=0;yy<N;yy++){const bits=parseInt(pattern.slice(yy*2,yy*2+2),16);for(let xx=0;xx<N;xx++)if(bits&(1<<xx))g.rect(dx+xx*w/N,dy+yy*h/N,w/N+.3,h/N+.3);}g.clip();g.drawImage(tile(11,v&7,P),dx,dy,w,h);g.restore();
-      }else g.drawImage(tile(kind,v&7,P),dx,dy,w,h);
+      if (kd===11 && (s.grass[i]===0 || partial)) {
+        M.Render.drawMownTile(g,s,i,dx,dy,w,h,d=>tile(M.stripeLight(d)?13:12,0,P));
+        if (partial) {
+          const pattern=M.Sim.grassPattern(s,i),N=M.GRASS_SUBDIV;
+          g.save();g.beginPath();for(let yy=0;yy<N;yy++){const bits=parseInt(pattern.slice(yy*2,yy*2+2),16);for(let xx=0;xx<N;xx++)if(bits&(1<<xx))g.rect(dx+xx*w/N,dy+yy*h/N,w/N+.3,h/N+.3);}g.clip();g.drawImage(tile(11,v&7,P),dx,dy,w,h);g.restore();
+        }
+      } else g.drawImage(tile(kd,v&7,P),dx,dy,w,h);
     }
     for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
       const i=y*s.W+x;if(s.kind[i]!==11||!s.grass[i])continue;

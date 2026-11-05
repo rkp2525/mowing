@@ -59,9 +59,10 @@
     return c;
   }
   function cutTile(d, v) {
-    const k = P, c = canvas(k, k), g = c.getContext('2d'), r = rngf(v * 131 + d * 17);
-    const light = d === 1 || d === 3;
-    g.fillStyle = lin(g, 0, 0, 0, k, [[0, light ? '#a0ee6e' : '#68bd45'], [1, light ? '#8fe05f' : '#5fb23e']]); g.fillRect(0, 0, k, k);
+    const k = P, c = canvas(k, k), g = c.getContext('2d'), r = rngf(131 + d * 17);
+    const light = M.stripeLight(d);
+    g.fillStyle = light ? M.MOWN_COLORS.light : M.MOWN_COLORS.dark;
+    g.fillRect(0, 0, k, k);
     const horiz = d === 1 || d === 2;
     g.lineWidth = Math.max(1, k * 0.018); g.lineCap = 'round';
     for (let i = 0; i < 20; i++) {
@@ -69,8 +70,20 @@
       g.strokeStyle = r() > 0.5 ? (light ? 'rgba(200,255,150,.38)' : 'rgba(210,255,160,.22)') : (light ? 'rgba(40,120,40,.14)' : 'rgba(30,100,35,.22)');
       g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
     }
-    for (let i = 0; i < 3; i++) if (r() > 0.4) { g.fillStyle = 'rgba(214,250,160,.8)'; g.save(); g.translate(r() * k, r() * k); g.rotate(r() * 3); g.fillRect(0, 0, 0.07 * k, 0.02 * k); g.restore(); }
     return c;
+  }
+
+  function drawMownTile(g, s, i, x, y, w, h, tileForDirection) {
+    const groups = M.Sim.stripePatterns(s, i), N = M.GRASS_SUBDIV;
+    g.drawImage(tileForDirection(groups[0]?.direction || M.Sim.DIR.N), x, y, w, h);
+    for (const group of groups.slice(1)) {
+      g.save(); g.beginPath();
+      for (let row = 0; row < N; row++) {
+        const bits = parseInt(group.pattern.slice(row * 2, row * 2 + 2), 16);
+        for (let col = 0; col < N; col++) if (bits & (1 << col)) g.rect(x + col * w / N, y + row * h / N, w / N + .15, h / N + .15);
+      }
+      g.clip(); g.drawImage(tileForDirection(group.direction), x, y, w, h); g.restore();
+    }
   }
 
   /* ---------------- terrain tiles ---------------- */
@@ -300,6 +313,15 @@
 
   // flowers are cached to a sprite per (colour, variant) at the current scale; sway is a cheap skew
   function drawFlowerCached(g, e, t) {
+    if (e.stems) {
+      for (const stem of e.stems) {
+        g.save(); g.translate(stem.x * C, stem.y * C); g.scale(M.FLOWER_SCALE, M.FLOWER_SCALE);
+        if (stem.clipped) { g.fillStyle = '#73925b'; g.fillRect(-.4, -.7, .8, 1); }
+        else drawFlowerCached(g, { x: 0, y: 0, color: e.color }, t + stem.x);
+        g.restore();
+      }
+      return;
+    }
     const SN = M.SpritesNature;
     if (SN) {
       const vr = (((e.x * 7 + e.y * 3) | 0) % 3 + 3) % 3, col = e.color % 4;
@@ -600,9 +622,7 @@
       const dx = gx(x), dy = gy(y), dw = gx(x + 1) - dx + 1, dh = gy(y + 1) - dy + 1;
       if (kd === K.GRASS) {
         if (s.grass[i] > 0 && (!s.subRemaining || s.subRemaining[i] === M.GRASS_SUBDIV**2)) continue;
-        const d = s.dir[i] || 1, tl = getTile('c' + d + '_' + (v & 3), () => cutTile(d, v & 3));
-        ctx.drawImage(tl, dx, dy, dw, dh);
-        const tn = s.tint[i]; if (tn) { ctx.fillStyle = tn > 0 ? `rgba(255,250,140,${tn / 160})` : `rgba(0,40,40,${-tn / 190})`; ctx.fillRect(dx, dy, dw, dh); }
+        drawMownTile(ctx, s, i, dx, dy, dw, dh, d => getTile('c' + d, () => cutTile(d, 0)));
       } else {
         const tl = getTile('k' + kd + '_' + v, () => terrainTile(kd, v));
         ctx.drawImage(tl, dx, dy, dw, dh);
@@ -615,7 +635,7 @@
       if(pattern){const key=(th?'th':'tl')+(v&7)+pattern;tl=partialGrass.get(key);if(!tl){tl=grassTile(th,v&7,pattern);partialGrass.set(key,tl);if(partialGrass.size>256)partialGrass.delete(partialGrass.keys().next().value);}}
       else tl=getTile((th?'th':'tl')+(v&7),()=>grassTile(th,v&7));
       ctx.drawImage(tl, gx(x) - tl._m, gy(y) - tl._t);
-      const tn = s.tint[i]; if (tn) { ctx.fillStyle = tn > 0 ? `rgba(255,250,140,${tn / 200})` : `rgba(0,40,40,${-tn / 230})`; ctx.fillRect(gx(x), gy(y), gx(x + 1) - gx(x), gy(y + 1) - gy(y)); }
+      const tn = s.tint[i]; if (tn && s.subRemaining[i] === M.GRASS_SUBDIV ** 2) { ctx.fillStyle = tn > 0 ? `rgba(255,250,140,${tn / 200})` : `rgba(0,40,40,${-tn / 230})`; ctx.fillRect(gx(x), gy(y), gx(x + 1) - gx(x), gy(y + 1) - gy(y)); }
     }
 
     ctx.setTransform(u, 0, 0, u, -ox, -oy);
@@ -676,5 +696,5 @@
     return cv;
   }
 
-  M.Render = { bake, draw, drawFootprint, drawFx, emit, pop, updateFx, thumb, hash, fx, setScale };
+  M.Render = { drawMownTile, bake, draw, drawFootprint, drawFx, emit, pop, updateFx, thumb, hash, fx, setScale };
 })();

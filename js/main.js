@@ -8,16 +8,15 @@
 
   /* ---------------- save ---------------- */
   const KEY = 'lawnkid.v1';
-  const defSave = () => ({ money: 0, stars: [], best: [], tools: { scythe: true }, tool: 'scythe', upgrades: {}, music: 0.7, sfx: 0.85, muted: false, seenHow: false, artStyle: 'pixel', scytheGuide: false, aimAssist: true });
+  const defSave = () => ({ money: 0, stars: [], best: [], tools: { reel: true }, tool: 'reel', upgrades: {}, music: 0.7, sfx: 0.85, muted: false, seenHow: false, artStyle: 'pixel' });
   let save = defSave();
   try { Object.assign(save, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* private mode etc. */ }
-  save.scytheGuide = save.scytheGuide === true;
-  save.aimAssist = save.aimAssist !== false;
+  M.normalizeEquipment(save);
   save.artStyle = save.artStyle === 'realism' ? 'realism' : 'pixel';
   if (DEV && params.has('art')) save.artStyle = params.get('art') === 'realism' ? 'realism' : 'pixel';
   M.ArtStyles.setStyle(save.artStyle).catch(e => console.warn(e.message));
-  delete save.autoSwing; // obsolete preference: scythe swings are always manual
-  if (DEV) { save.tools = { scythe: true, reel: true, gas: true, ride: true }; save.money = 999; if (params.get('up')) for (const u of M.UPGRADES) save.upgrades[u.id] = +params.get('up'); }
+  delete save.autoSwing; delete save.scytheGuide; delete save.aimAssist; // retired tool preferences
+  if (DEV) { save.tools = { reel: true, gas: true, ride: true }; save.money = 999; if (params.get('up')) for (const u of M.UPGRADES) save.upgrades[u.id] = +params.get('up'); }
   function persist() { if (DEV) return; try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ } }
   const unlocked = (i) => DEV || i === 0 || (save.stars[i - 1] || 0) > 0;
   function applyAudioPrefs() { A.setMusicVolume(save.music); A.setSfxVolume(save.sfx); A.setMuted(!!save.muted); }
@@ -59,13 +58,9 @@
   const keys = {};
   const touch = { id: null, ox: 0, oy: 0, x: 0, y: 0, active: false };
   const mouse = { down: false, snip: false, seen: false, x: 0, y: 0 };
-  let trimMode = false, swHeld = false; // C toggles trimmers; Space then trims instead of sweeping
-  let swingQueued = false;
   window.addEventListener('keydown', (e) => {
     if (['INPUT', 'SELECT'].includes(e.target.tagName)) return;
     keys[e.code] = true;
-    if (G.mode === 'play' && e.code === 'Space' && !e.repeat) swingQueued = true;
-    if (G.mode === 'play' && e.code === 'KeyC' && !e.repeat) toggleTrim();
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if (G.mode === 'play') {
       if (e.code === 'Escape' || e.code === 'KeyP') pause();
@@ -78,7 +73,7 @@
     } else if (G.mode === 'paused' && (e.code === 'Escape' || e.code === 'KeyP')) resume();
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
-  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; swHeld = false; swingQueued = false; if (G.mode === 'play') pause(); });
+  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; if (G.mode === 'play') pause(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.mode === 'play') pause(); });
 
   cv.addEventListener('pointerdown', (e) => {
@@ -88,7 +83,6 @@
       if (e.button !== 0 && e.button !== 2) return;
       mouse.x = e.clientX; mouse.y = e.clientY; mouse.seen = true;
       if (e.button === 0) mouse.down = true;
-      else toggleTrim();
     }
     else {
       document.body.classList.add('touch'); mouse.seen = false; // touch is now the current input, drop the stale cursor aim
@@ -115,12 +109,6 @@
     else if (e.pointerId === touch.id) { touch.active = false; touch.id = null; $('joy-base').style.display = 'none'; }
   };
   cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
-  const sb = $('btn-swing');
-  sb.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') mouse.seen = false; swingQueued = true; swHeld = true; sb.classList.add('down'); A.init(); sb.setPointerCapture(e.pointerId); e.preventDefault(); });
-  const sbUp = () => { swHeld = false; sb.classList.remove('down'); };
-  sb.addEventListener('pointerup', sbUp); sb.addEventListener('pointercancel', sbUp);
-  const nb = $('btn-snip');
-  if (nb) nb.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') mouse.seen = false; toggleTrim(); A.init(); e.preventDefault(); }); // dev pages omit the button
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
   let kHold = 0, lockToggle = false, lockAxis = null;
@@ -152,14 +140,7 @@
       else if (lockAxis === 'y' && ax > ay * 1.6) lockAxis = 'x';
       if (lockAxis === 'x') { mx = Math.sign(mx) * mg; my = 0; } else { my = Math.sign(my) * mg; mx = 0; }
     } else if (mg <= 0.1) lockAxis = null;
-    // Scythe aim follows the cursor (desktop). Touch / keyboard-only falls back to travel direction.
-    let aim;
-    if (mouse.seen && !touch.active && G.s && G.s.tool === 'scythe') {
-      const px = (G.s.p.x * C - cam.x) * Z, py = (G.s.p.y * C - cam.y) * Z;
-      if (Math.hypot(mouse.x - px, mouse.y - py) > 10) aim = Math.atan2(mouse.y - py, mouse.x - px);
-    }
-    const act = swingQueued; swingQueued = false;
-    return { mx, my, act, aim, snip: trimMode, hold: !!(keys.Space || swHeld) };
+    return { mx, my };
   }
 
   if (DEV && params.has('controlcheck')) window.__readInput = readInput;
@@ -167,7 +148,8 @@
   /* ---------------- gameplay flow ---------------- */
   function startLevel(i, toolId) {
     A.init(); applyAudioPrefs();
-    mouse.down = false; trimMode = false; swHeld = false; swingQueued = false;
+    mouse.down = false;
+    toolId = M.TOOL_ORDER.includes(toolId) && save.tools[toolId] ? toolId : 'reel';
     G.idx = i; G.s = Sim.create(i, save, toolId); R.bake(G.s);
     G.mode = 'play'; G.paused = false; G.res = null; G.toldFuel = false;
     save.tool = toolId; persist();
@@ -178,7 +160,7 @@
     A.setMode('play'); A.startMusic();
     const def = M.LEVELS[i];
     if (!params.has('shot')) say(def.tip, 9000);
-    updateHudTool(); if (DEV && params.has('trim')) { trimMode = true; syncToolLabel(); } if (DEV && params.has('aim')) G.s.p.aimHeading = +params.get('aim') * Math.PI / 180; R.fx.parts.length = 0; R.fx.pops.length = 0;
+    updateHudTool(); R.fx.parts.length = 0; R.fx.pops.length = 0;
     if (DEV && params.get('warp')) warp(+params.get('warp'));
   }
   function warp(sec) { // dev: fast-forward with the bot
@@ -197,8 +179,7 @@
   function setZoom(v) { zoomOff = clamp(v, -3, 4); computeZ(); A.click(); }
   function updateHudTool() {
     const T = M.TOOLS[G.s.tool];
-    $('hud-tool-icon').textContent = T.icon; $('hud-tool-name').textContent = T.name; if (T.id === 'scythe') { trimMode = false; if ($('btn-snip')) $('btn-snip').classList.remove('on'); }
-    $('btn-swing').style.display = G.s.tool === 'scythe' ? '' : 'none'; if ($('btn-snip')) $('btn-snip').style.display = G.s.tool === 'scythe' ? '' : 'none';
+    $('hud-tool-icon').textContent = T.icon; $('hud-tool-name').textContent = T.name;
     const lbl = $('meter-label');
     $('meter-label').parentElement.style.display = G.s.tool === 'reel' ? 'none' : '';
     lbl.textContent = T.powered ? 'Fuel' : 'Stamina';
@@ -208,23 +189,6 @@
     const h = $('hint'); h.textContent = text; h.classList.remove('hidden'); h.style.animation = 'none'; void h.offsetWidth; h.style.animation = '';
     clearTimeout(hintTimer); hintTimer = setTimeout(() => h.classList.add('hidden'), ms || 4000);
   }
-  function toggleTrim() {
-    if (!G.s || G.s.tool !== 'scythe') return;
-    trimMode = !trimMode; A.click(); syncToolLabel();
-    save.cutUses = (save.cutUses || 0) + (trimMode ? 1 : 0); if (save.cutUses <= 4) persist();
-  }
-  function syncToolLabel() {
-    const s = G.s; if (!s || s.tool !== 'scythe') return;
-    const T = M.TOOLS[s.tool]; $('hud-tool-icon').textContent = trimMode ? '✂️' : T.icon; $('hud-tool-name').textContent = trimMode ? 'Trimmers' : T.name;
-    if ($('btn-snip')) $('btn-snip').classList.toggle('on', trimMode);
-  }
-  // Contextual coaching: only when a sweep is about to clip something, and only until the player has used Cut.
-  let lastCoach = -99;
-  function coach(s) {
-    if (s.tool !== 'scythe' || trimMode || save.cutUses >= 2 || !s.aimHit || s.sw || G.t - lastCoach < 18) return;
-    lastCoach = G.t;
-    say(document.body.classList.contains('touch') ? 'Tap TRIM for the trimmers' : 'Press C for the trimmers', 3200);
-  }
   function toast(text) { const t = $('toast'); t.textContent = text; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 2200); }
 
   function handle(ev, s) {
@@ -233,15 +197,13 @@
         case 'swing': A.swing(); break;
         case 'snip': A.snipswing(); break;
         case 'cut': {
-          // A scythe already plays one sound on its swing event. Grass is cut
-          // over multiple frames, which must not add repeated snips.
-          if (s.ts.id !== 'scythe') A.snip(e.n);
+          A.snip(e.n);
           R.emit('grass', e.x, e.y, Math.min(4, e.n), { c: Math.random() < 0.5 ? '#9be96b' : '#6bbd47' });
           break;
         }
         case 'clang': A.clang(); R.emit('spark', e.x, e.y, 8); R.pop('CLANG!', e.x, e.y, '#ffe27a'); break;
         case 'stall': A.stall(); break;
-        case 'flower': A.flower(); R.emit('petal', e.x, e.y, 10, { c: ['#f06a8a', '#f5c542', '#9b7bea', '#ff8f4a'][(Math.random() * 4) | 0] }); R.pop('Oops! Flowers', e.x, e.y, '#ff9bb0'); break;
+        case 'flower': R.emit('petal', e.x, e.y, Math.min(2, Math.ceil(e.amount * 3)), { c: '#e8b6bc' }); break;
         case 'gnome': A.gnome(); R.emit('spark', e.x, e.y, 14); R.pop('Gnome found!', e.x, e.y, '#ffe27a'); break;
         case 'gnomebreak': A.clang(); R.pop('Oh no, a gnome!', e.x, e.y, '#ff9b8a'); R.emit('dust', e.x, e.y, 8); break;
         case 'toy': A.pickup(); R.pop('Tidy!', e.x, e.y, '#bff0ff'); R.emit('spark', e.x, e.y, 6); break;
@@ -296,7 +258,6 @@
       const s = G.s;
       const n = Math.max(1, Math.ceil(dt / (1 / 90))), h = dt / n;
       for (let k = 0; k < n; k++) { const inp = G.bot ? G.bot.input(h) : readInput(h); handle(Sim.step(s, inp, h), s); }
-      coach(s);
       followCam(s, dt);
       const T = s.ts, spd = clamp(s.p.speed / T.speed, 0, 1);
       A.tool(T.powered && s.fuel <= 0 ? null : T.id, spd, s.cutting && (T.id !== 'reel' || spd > 0.1));
@@ -354,10 +315,10 @@
   }
 
   function showHow(back_) {
-    const el = show(`<div class="panel"><h2>How to Play 🌱</h2><p class="sub">Mow the neighbors' lawns, earn cash, and grow from a kid with a scythe to the town's best groundskeeper.</p>
-      <h3>Move and cut</h3><div class="keys"><div><b>Hold trackpad / mouse click</b></div><div>Slide to steer and walk. Release to stop.</div><div><kbd>W A S D</kbd> / arrows</div><div>Keyboard movement works too. Face where you travel.</div><div><kbd>Space</kbd> / SWING</div><div>Sweep the scythe across open lawn. It aims at your cursor.</div><div><kbd>C</kbd> / right-click</div><div>Switch between the scythe and the trimmers. Space then trims: narrow and precise, for around flowers and rocks.</div><div>Touch</div><div>Drag to move; SWING sweeps; TRIM switches to the trimmers.</div></div>
+    const el = show(`<div class="panel"><h2>How to Play 🌱</h2><p class="sub">Mow the neighbors' lawns, earn cash, and grow from a kid with a quiet reel mower to the town's best groundskeeper.</p>
+      <h3>Move and cut</h3><div class="keys"><div><b>Hold trackpad / mouse click</b></div><div>Slide to steer and walk. Release to stop.</div><div><kbd>W A S D</kbd> / arrows</div><div>Keyboard movement works too. Face where you travel.</div><div>Touch</div><div>Drag to steer. The mower cuts as you move.</div></div>
       <details class="control-details"><summary>Optional precision controls</summary><div class="keys"><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Switch tool</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
-      <h3>Get paid for quality</h3><div class="keys"><div>🌿 Coverage</div><div>Mow every blade. Dark thick grass takes two passes without a strong mower.</div><div>📏 Stripes</div><div>Long, straight lines look pro.</div><div>🌷 Care</div><div>Don't mow flowers, hit rocks, or smash gnomes. Pick up toys.</div><div>⏱ Speed</div><div>Beat the par time.</div><div>⛽ Fuel</div><div>Powered mowers need refueling at the utility truck.</div></div>
+      <h3>Get paid for quality</h3><div class="keys"><div>🌿 Coverage</div><div>Mow every blade. Dark thick grass takes two passes without a strong mower.</div><div>📏 Stripes</div><div>Long, straight lines look pro.</div><div>🌷 Care</div><div>Clip flowers carefully: only the amount cut reduces care and pay. Rocks simply block your path. Pick up toys and gnomes.</div><div>⏱ Speed</div><div>Beat the par time.</div><div>⛽ Fuel</div><div>Powered mowers need refueling at the utility truck.</div></div>
       <div class="row end" style="margin-top:14px"><button class="big-btn" id="b-ok">Got it!</button></div></div>`, 'dim');
     btn(el, '#b-ok', () => { A.click(); back_(); });
   }
@@ -368,8 +329,7 @@
       <label class="art-choice"><input type="radio" name="art-style" value="pixel" ${save.artStyle === 'pixel' ? 'checked' : ''}><span><b>Fine Pixel</b><small>Pixel characters and equipment in our original lush lawns.</small></span></label>
       <label class="art-choice"><input type="radio" name="art-style" value="realism" ${save.artStyle === 'realism' ? 'checked' : ''}><span><b>Textured Realism</b><small>A fully rebuilt world with natural materials and warm summer light.</small></span></label>
       </fieldset><p class="art-status" id="art-status" role="status">Your progress is shared between both styles.</p>
-      <details class="control-details"><summary>Controls</summary><div class="keys"><div><kbd>W A S D</kbd> / arrows</div><div>Move</div><div>Click and hold</div><div>Walk toward the cursor</div><div>Mouse</div><div>Aim the scythe</div><div><kbd>Space</kbd></div><div>Sweep with the scythe, or trim with the trimmers</div><div><kbd>C</kbd> / right-click</div><div>Switch scythe ⇄ trimmers (precise, for flowers and rocks)</div><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Switch tool</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
-      <div class="set-row"><label for="s-guide">Scythe guide</label><input type="checkbox" id="s-guide" ${save.scytheGuide ? 'checked' : ''}></div>
+      <details class="control-details"><summary>Controls</summary><div class="keys"><div><kbd>W A S D</kbd> / arrows</div><div>Move</div><div>Click and hold</div><div>Walk toward the cursor</div><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Switch tool</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
       <div class="set-row"><label>Music</label><input type="range" id="s-mus" min="0" max="100" value="${save.music * 100}"></div>
       <div class="set-row"><label>Effects</label><input type="range" id="s-sfx" min="0" max="100" value="${save.sfx * 100}"></div>
       <div class="set-row"><label>Mute all</label><input type="checkbox" id="s-mute" ${save.muted ? 'checked' : ''}></div>
@@ -392,12 +352,11 @@
         }
       };
     });
-    el.querySelector('#s-guide').onchange = e => { save.scytheGuide = e.target.checked; persist(); };
     el.querySelector('#s-mus').oninput = (e) => { save.music = e.target.value / 100; applyAudioPrefs(); persist(); };
     el.querySelector('#s-sfx').oninput = (e) => { save.sfx = e.target.value / 100; applyAudioPrefs(); persist(); };
     el.querySelector('#s-sfx').onchange = () => A.coin();
     el.querySelector('#s-mute').onchange = (e) => { save.muted = e.target.checked; applyAudioPrefs(); persist(); };
-    btn(el, '#b-reset', () => { if (confirm('Erase all progress and start over?')) { const keep = { music: save.music, sfx: save.sfx, muted: save.muted, artStyle: save.artStyle, scytheGuide: save.scytheGuide, aimAssist: save.aimAssist }; save = Object.assign(defSave(), keep); persist(); A.error(); back_(); } });
+    btn(el, '#b-reset', () => { if (confirm('Erase all progress and start over?')) { const keep = { music: save.music, sfx: save.sfx, muted: save.muted, artStyle: save.artStyle }; save = Object.assign(defSave(), keep); persist(); A.error(); back_(); } });
     btn(el, '#b-ok', () => { A.click(); back_(); });
   }
 
@@ -427,7 +386,7 @@
 
   function showBrief(i) {
     const d = M.LEVELS[i], lv = M.buildLevel(i), c = (t) => lv.ents.filter((e) => e.t === t).length;
-    let sel = save.tools[save.tool] ? save.tool : 'scythe';
+    let sel = save.tools[save.tool] ? save.tool : 'reel';
     const draw = () => {
       const tools = M.TOOL_ORDER.map((t) => { const T = M.TOOLS[t], own = save.tools[t];
         return `<div class="tool ${sel === t ? 'sel' : ''} ${own ? '' : 'off'}" data-t="${t}">${d.rec === t ? '<span class="rec">Suggested</span>' : ''}<div class="ic">${own ? T.icon : '🔒'}</div><div class="tn">${T.name}</div></div>`; }).join('');
@@ -474,11 +433,9 @@
 
   function showPause() {
     const el = show(`<div class="panel" style="width:min(420px,100%)"><h2>Paused ⏸</h2><p class="sub">Take a breath. The grass isn't going anywhere.</p>
-      <div class="set-row"><label for="s-guide">Scythe guide</label><input type="checkbox" id="s-guide" ${save.scytheGuide ? 'checked' : ''}></div>
       <div class="set-row"><label>Music</label><input type="range" id="s-mus" min="0" max="100" value="${save.music * 100}"></div>
       <div class="set-row"><label>Effects</label><input type="range" id="s-sfx" min="0" max="100" value="${save.sfx * 100}"></div>
       <div class="row" style="margin-top:14px;flex-direction:column;align-items:stretch"><button class="big-btn" id="b-res">▶ Resume</button><button class="big-btn ghost" id="b-rs">↺ Restart job</button><button class="big-btn ghost" id="b-q">Quit to jobs</button></div></div>`, 'dim');
-    el.querySelector('#s-guide').onchange = e => { save.scytheGuide = e.target.checked; persist(); };
     el.querySelector('#s-mus').oninput = (e) => { save.music = e.target.value / 100; applyAudioPrefs(); persist(); };
     el.querySelector('#s-sfx').oninput = (e) => { save.sfx = e.target.value / 100; applyAudioPrefs(); persist(); };
     btn(el, '#b-res', resume);
@@ -497,7 +454,7 @@
       <div class="result-stars" id="r-stars">★★★★★</div>
       <div class="brk">${bar('Coverage', res.cov)}${bar('Stripes', res.pattern)}${bar('Care', res.care)}${bar('Speed', res.speed)}</div>
       <div>${line('Base pay', '$' + res.payBase)}${res.bonusGnome ? line('🧙 Gnomes found ×' + s.gnomesFound, '+$' + res.bonusGnome) : ''}${res.bonusToy ? line('🧸 Toys tidied ×' + s.toysFound, '+$' + res.bonusToy) : ''}
-      ${res.fines ? line('💔 Damage (' + s.flowersLost + ' flowers, ' + s.rockHits + ' rocks)', '−$' + res.fines) : ''}${res.cardsMult > 1 ? line('💼 Business cards', '×' + res.cardsMult.toFixed(2)) : ''}
+      ${s.flowersLost > 0 ? line('🌷 Flowers clipped · ' + s.flowersLost.toFixed(2) + ' patches', '−$' + res.fines) : ''}${res.cardsMult > 1 ? line('💼 Business cards', '×' + res.cardsMult.toFixed(2)) : ''}
       ${!res.first ? line('🔁 Repeat customer', '×0.5') : ''}<div class="pay-line total"><span>Paid</span><span id="r-pay">$0</span></div></div>
       <p class="note">${res.first ? '' : 'Repeat jobs pay half, but you can still improve your stars.'} Time ${fmt(res.time)} · par ${fmt(d.par)}${lastLevel && res.first ? '<br><b>🏆 You finished the neighborhood! More jobs coming soon…</b>' : ''}</p>
       <div class="row" style="margin-top:12px"><button class="big-btn ghost" id="b-q">Jobs</button><button class="big-btn ghost" id="b-rt">↺ Retry</button><span class="grow"></span>${hasNext ? '<button class="big-btn" id="b-nx">Next job →</button>' : ''}</div></div>`, 'dim');
@@ -533,7 +490,7 @@
   resize(); newDemo();
   const startScreen = params.get('screen');
   if (params.has('level')) {
-    startLevel(clamp(+params.get('level') - 1, 0, M.LEVELS.length - 1), params.get('tool') || 'scythe');
+    startLevel(clamp(+params.get('level') - 1, 0, M.LEVELS.length - 1), params.get('tool') || 'reel');
     if (params.get('screen') === 'results') finishJob();
   } else if (startScreen === 'board') showBoard();
   else if (startScreen === 'shop') showShop('tools');

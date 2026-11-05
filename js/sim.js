@@ -11,6 +11,7 @@
 
   /* Compute tool stats modified by upgrades. */
   function toolStats(toolId, save) {
+    toolId = M.TOOL_ORDER.includes(toolId) ? toolId : 'reel';
     const T = M.TOOLS[toolId];
     const b = upgradeLv(save, 'blades'), bo = upgradeLv(save, 'boots'), tk = upgradeLv(save, 'tank'), st = upgradeLv(save, 'steer');
     return {
@@ -32,9 +33,9 @@
     const n = lv.W * lv.H;
     const s = {
       lv, W: lv.W, H: lv.H, type: lv.type,
-      grass: new Uint8Array(n), subGrass: new Uint8Array(n * M.GRASS_SUBDIV ** 2), subRemaining: new Uint8Array(n), protected: lv.protected, dir: new Uint8Array(n),
+      grass: new Uint8Array(n), subGrass: new Uint8Array(n * M.GRASS_SUBDIV ** 2), subRemaining: new Uint8Array(n), protected: lv.protected, dir: new Uint8Array(n), subDir: new Uint8Array(n * M.GRASS_SUBDIV ** 2), stripePatterns: new Array(n),
       dirty: [], remaining: 0, total: lv.total,
-      ents: lv.ents.map((e) => Object.assign({}, e, { alive: true, found: false, cd: 0 })),
+      ents: lv.ents.map((e) => Object.assign({}, e, { alive: true, found: false, cd: 0, ...(e.t === 'flower' ? { stems: M.flowerStems(e) } : {}) })),
       p: { x: lv.spawn.x, y: lv.spawn.y, heading: -Math.PI / 2, aimHeading: -Math.PI / 2, speed: 0, step: 0 },
       time: 0, started: false, done: false,
       stall: 0, sw: null, swCool: 0, tired: false, stamina: 100, fuel: 100,
@@ -53,12 +54,13 @@
     }
     for (const e of s.ents) { if (e.t === 'gnome') s.gnomesTotal++; if (e.t === 'toy') s.toysTotal++; }
     s.dirty.push(-1); // -1 = full redraw
-    setTool(s, toolId || 'scythe');
+    setTool(s, toolId || 'reel');
     s.fuel = s.ts.fuelMax; s.stamina = s.ts.staminaMax;
     return s;
   }
 
   function setTool(s, toolId) {
+    toolId = M.TOOL_ORDER.includes(toolId) ? toolId : 'reel';
     const old = s.ts;
     s.tool = toolId; s.ts = toolStats(toolId, s.save);
     s.toolsUsed[toolId] = true;
@@ -72,6 +74,7 @@
     return M.BLOCKED[s.type[cy * s.W + cx]] === 1;
   }
   function collides(s, x, y, r) {
+    for (const e of s.ents) if (e.t === 'rock' && Math.hypot(x - e.x, y - e.y) < r + M.ROCK_RADIUS) return true;
     const x0 = Math.floor(x - r), x1 = Math.floor(x + r), y0 = Math.floor(y - r), y1 = Math.floor(y + r);
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       if (!blockedCell(s, cx, cy)) continue;
@@ -91,19 +94,22 @@
   // A cell is 8x8 tiny mowing samples. The grass texture may be a big tile,
   // but only the samples physically crossed by the blade are removed.
   function cutCell(s, i, power, dc, footprint) {
-    if (!s.grass[i]) return 0;
+    if (!s.grass[i] && !s.dir[i]) return 0;
     const N = M.GRASS_SUBDIV, count = N * N, cx = i % s.W, cy = Math.floor(i / s.W);
     let cut = 0, changed = false, high = 0;
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
       const k = i * count + y * N + x, value = s.subGrass[k];
-      if (!value) continue;
+      if (!value && !s.subDir[k]) continue;
       if (footprint(cx + (x + .5) / N, cy + (y + .5) / N, 0)) {
-        s.subGrass[k] = Math.max(0, value - power); changed = true;
-        if (!s.subGrass[k]) { cut++; s.subRemaining[i]--; }
+        if (value) {
+          s.subGrass[k] = Math.max(0, value - power); changed = true;
+          if (!s.subGrass[k]) { cut++; s.subRemaining[i]--; }
+        }
+        if (!s.subGrass[k] && s.subDir[k] !== dc) { s.subDir[k] = dc; changed = true; }
       }
       high = Math.max(high, s.subGrass[k]);
     }
-    if (changed) { s.grass[i] = high; s.dir[i] = dc; s.dirty.push(i); }
+    if (changed) { s.grass[i] = high; s.dir[i] = dc; s.dirty.push(i); s.stripePatterns[i] = null; }
     const area = cut / count;
     s.remaining = Math.max(0, s.remaining - area);
     if (dc === DIR.E || dc === DIR.W) s.cutH += area; else s.cutV += area;
@@ -123,6 +129,7 @@
     }
     return true;
   }
+  // Retired scythe/trimmer mechanics, kept for future experiments. setTool excludes them.
   // Scythe modes. The swing always goes exactly where the player aims (cursor).
   //   sweep: wide arc, full reach, fast over open lawn (will clip flowers / hit rocks)
   //   snip : narrow cone, shorter reach, cheap, for precise work around flowers & rocks
@@ -287,21 +294,22 @@
       for (let cy = Math.max(0, y0); cy <= Math.min(s.H - 1, y1); cy++)
         for (let cx = Math.max(0, x0); cx <= Math.min(s.W - 1, x1); cx++) {
           const i = cy * s.W + cx;
-          if (s.grass[i]) cutN += cutCell(s, i, T.power, dc, fp);
+          if (s.grass[i] || s.dir[i]) cutN += cutCell(s, i, T.power, dc, fp);
         }
       // hazards
       for (const e of s.ents) {
         if (!e.alive) continue;
         if (e.cd > 0) e.cd -= dt;
-        if (e.t === 'rock' && e.cd <= 0 && fp(e.x, e.y, 0.25)) {
-          e.cd = 1.5; s.rockHits++; ev.push({ e: 'clang', x: e.x, y: e.y });
-          if (T.id === 'scythe') { s.sw = null; s.stamina = Math.max(0, s.stamina - 14); s.stall = 0.35; }
-          else { s.stall = T.id === 'reel' ? 0.9 : 1.5; if (T.powered) s.fuel = Math.max(0, s.fuel - 3); ev.push({ e: 'stall' }); }
-          p.speed = 0;
-          // bounce back off the rock so you can steer around it
-          for (let k = 0; k < 8; k++) { const bx = p.x - hx * 0.25, by = p.y - hy * 0.25; if (!collides(s, bx, by, T.r)) { p.x = bx; p.y = by; } }
-        } else if (e.t === 'flower' && fp(e.x, e.y, 0.1)) {
-          e.alive = false; s.flowersLost++; ev.push({ e: 'flower', x: e.x, y: e.y });
+        if (e.t === 'flower') {
+          let clipped = 0;
+          for (const stem of e.stems) if (!stem.clipped && fp(stem.x, stem.y, 0)) {
+            stem.clipped = true; clipped++;
+          }
+          if (clipped) {
+            const amount = clipped / e.stems.length;
+            s.flowersLost += amount;
+            ev.push({ e: 'flower', x: e.x, y: e.y, amount });
+          }
         } else if ((e.t === 'gnome' || e.t === 'toy') && !e.found && fp(e.x, e.y, 0.1)) {
           e.alive = false;
           if (e.t === 'gnome') { s.gnomesBroken++; ev.push({ e: 'gnomebreak', x: e.x, y: e.y }); } else { s.toysChopped++; ev.push({ e: 'toychop', x: e.x, y: e.y }); if (T.powered) { s.stall = Math.max(s.stall, 0.8); ev.push({ e: 'stall' }); } }
@@ -321,6 +329,21 @@
     for(let y=0;y<N;y++){let bits=0;for(let x=0;x<N;x++)if(s.subGrass[i*count+y*N+x])bits|=1<<x;pattern+=bits.toString(16).padStart(2,'0');}
     return pattern;
   }
+  // Cache directional masks so touching one part of a cell never recolors the rest.
+  function stripePatterns(s, i) {
+    if (s.stripePatterns[i]) return s.stripePatterns[i];
+    const N = M.GRASS_SUBDIV, groups = [];
+    for (const direction of [DIR.N, DIR.S, DIR.E, DIR.W]) {
+      let pattern = '', any = false;
+      for (let y = 0; y < N; y++) {
+        let bits = 0;
+        for (let x = 0; x < N; x++) if (s.subDir[i * N * N + y * N + x] === direction) bits |= 1 << x;
+        any ||= bits !== 0; pattern += bits.toString(16).padStart(2, '0');
+      }
+      if (any) groups.push({ direction, pattern });
+    }
+    return s.stripePatterns[i] = groups;
+  }
   function coverage(s) { return s.total ? 1 - s.remaining / s.total : 1; }
 
   /* Final scoring. Returns breakdown + pay. */
@@ -331,7 +354,7 @@
     const tot = s.cutH + s.cutV;
     const dom = tot ? Math.max(s.cutH, s.cutV) / tot : 0.5;
     const pattern = clamp((dom - 0.55) / 0.4, 0, 1);
-    const dmgPoints = s.flowersLost * 0.14 + s.rockHits * 0.10 + s.gnomesBroken * 0.18 + s.toysChopped * 0.08;
+    const dmgPoints = s.flowersLost * 0.14 + s.gnomesBroken * 0.18 + s.toysChopped * 0.08;
     const care = clamp(1 - dmgPoints, 0, 1);
     const speed = clamp(def.par / Math.max(1, s.time) , 0, 1);
     const sc = 0.5 * covN + 0.18 * pattern + 0.17 * care + 0.15 * speed;
@@ -340,11 +363,11 @@
     const payBase = def.pay * (0.3 + 0.7 * sc) * (cov < 0.8 ? 0 : 1);
     const bonusGnome = s.gnomesFound * (3 + def.id);
     const bonusToy = s.toysFound * Math.ceil(1 + def.id * 0.4);
-    const fines = Math.round((s.flowersLost * 0.03 + s.rockHits * 0.015) * def.pay);
+    const fines = Math.round((s.flowersLost * 0.03) * def.pay);
     const mult = 1 + 0.08 * s.cards;
     const pay = Math.max(0, Math.round((payBase + bonusGnome + bonusToy) * mult - fines));
     return { cov, covN, pattern, care, speed, score: sc, stars, payBase: Math.round(payBase), bonusGnome, bonusToy, fines, cardsMult: mult, pay, time: s.time };
   }
 
-  M.Sim = { create, step, setTool, coverage, score, toolStats, collides, DIR, dirCode, upgradeLv, blockedCell, scytheMode, makeFootprint, grassPattern };
+  M.Sim = { create, step, setTool, coverage, score, toolStats, collides, DIR, dirCode, upgradeLv, blockedCell, scytheMode, makeFootprint, grassPattern, stripePatterns };
 })();
