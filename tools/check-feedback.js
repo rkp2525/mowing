@@ -157,3 +157,18 @@ test('Log context identifies lawn, equipment, game screen, and art style', () =>
   assert.equal(M.Feedback.reportContext({ context: { lawn: 'Maple', equipment: 'Fertilizer', screen: 'truck', artStyle: 'pixel' } }), 'Maple · Fertilizer · truck · pixel');
   assert.equal(M.Feedback.reportContext({}), '');
 });
+
+test('legacy session identity survives deleting its first note or an idle-gap bridge', () => {
+  const saved = [0, 20, 40].map((minute, i) => ({ id: `note-${i}`, timestamp: new Date(Date.UTC(2026, 9, 29, 10, minute)).toISOString() }));
+  const original = M.Feedback.feedbackSessions(saved)[0].id;
+  saved[0].deletedAt = 'deleted';
+  let groups = M.Feedback.feedbackSessions(saved);
+  assert.equal(groups[0].id, original);
+  assert.deepEqual(groups[0].reports.map(r => r.id), ['note-1', 'note-2']);
+  saved[1].deletedAt = 'deleted';
+  groups = M.Feedback.feedbackSessions(saved);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].id, original);
+  delete saved[0].deletedAt; delete saved[1].deletedAt;
+  assert.equal(M.Feedback.feedbackSessions(saved)[0].id, original);
+});

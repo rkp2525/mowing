@@ -52,9 +52,7 @@ const SESSION_IDLE_MS = 30 * 60 * 1000;
 function feedbackSessions(saved) {
   const groups = new Map();
   let legacy;
-  for (const report of [...saved]
-    .filter((r) => !r.deletedAt)
-    .sort((a, b) => a.timestamp.localeCompare(b.timestamp))) {
+  for (const report of [...saved].sort((a, b) => a.timestamp.localeCompare(b.timestamp))) {
     if (!report.sessionId) {
       if (!legacy || Date.parse(report.timestamp) - legacy.lastAt > SESSION_IDLE_MS) {
         legacy = {
@@ -66,6 +64,7 @@ function feedbackSessions(saved) {
       legacy.lastAt = Date.parse(report.timestamp);
     }
     const id = report.sessionId || legacy.id;
+    if (report.deletedAt) continue;
     if (!groups.has(id))
       groups.set(id, { id, startedAt: report.sessionStartedAt || report.timestamp, reports: [] });
     groups.get(id).reports.push(report);

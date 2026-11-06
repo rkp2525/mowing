@@ -11,13 +11,16 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temp = await mkdtemp(resolve(tmpdir(), 'mowing-feedback-'));
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
-  const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+  let pathname;
+  try { pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname); }
+  catch { res.writeHead(400).end(); return; }
   const file = resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
   if (!file.startsWith(root + '/') || pathname.split('/').some(part => part.startsWith('.'))) { res.writeHead(403).end(); return; }
   try { const data = await readFile(file); res.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream' }); res.end(data); }
   catch { res.writeHead(404).end(); }
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+assert.equal((await fetch(`http://127.0.0.1:${server.address().port}/%`)).status, 400);
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
   '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
   '--remote-debugging-pipe', `--user-data-dir=${temp}/profile`,
@@ -199,6 +202,15 @@ try {
   await key('Escape'); assert.equal(await evaluate(`localStorage.getItem('lawnkid.v1')`), savedProgress);
   await click('#b-ok'); assert.equal(await evaluate(`!!document.querySelector('#b-res')`), true); await click('#b-res');
   console.log('PASS: preferences survive reload, correct selected-lawn context, feedback from mid-level Settings, and progress preservation');
+  await click('#hud-pause'); await click('#b-settings');
+  await evaluate(`window.confirm=()=>true`); await click('#b-reset');
+  assert.equal(await evaluate(`!!document.querySelector('.board') && !document.querySelector('#b-res')`), true);
+  await key('Escape');
+  const resetProgress = await evaluate(`JSON.parse(localStorage.getItem('lawnkid.v1'))`);
+  assert.equal(resetProgress.money, 0); assert.deepEqual(resetProgress.stars, []); assert.deepEqual(resetProgress.best, []);
+  await command('Page.reload'); await until(`!!document.querySelector('#b-play')`);
+  assert.equal(await evaluate(`JSON.parse(localStorage.getItem('lawnkid.v1')).money`), 0);
+  console.log('PASS: mid-level reset discards active job, cannot resume, clears progress, and survives reload');
   console.log('Screenshots and downloaded fixtures: ' + temp);
 } finally {
   await command('Browser.close', {}, null).catch(() => {});
