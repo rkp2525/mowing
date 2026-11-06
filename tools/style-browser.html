@@ -26,12 +26,14 @@
       </div>
       <div class="hud-right">
         <div class="chip" id="hud-time">0:00</div>
-        <button id="hud-lock" class="chip icon-btn" title="Straight-line lock (Shift / L)">↔</button>
+        <button id="hud-precision" class="chip icon-btn" title="Hold for Precision mode (Shift)" aria-label="Hold for Precision mode" aria-pressed="false">🎯</button>
+        <button id="hud-lock" class="chip icon-btn" title="Straight-line lock (L)">↔</button>
         <button id="hud-zoom" class="chip icon-btn" title="Zoom (+/-)">🔍</button>
         <button id="hud-pause" class="chip icon-btn" title="Pause (Esc)">⏸</button>
       </div>
     </div>
     <div class="meter-wrap"><div class="meter-label" id="meter-label">Stamina</div><div class="meter"><div id="meter-fill"></div></div></div>
+    <div id="precision-status" class="chip precision-status hidden" role="status">Precision mode · 30% speed</div>
     <div id="grounds-status" class="chip grounds-status" role="status"></div>
     <button id="btn-fertilize" class="big-btn grounds-action hidden">Scatter · Space</button>
     <div id="hint" class="hint hidden"></div>
@@ -53,6 +55,7 @@ if(sessionStorage.getItem('lawnkid.style-test-phase')!=='reload'){
 </script>
 <script src="../js/data.js"></script>
 <script src="../js/groundskeeping.js"></script>
+<script src="../js/precision.js"></script>
 <script src="../js/sim.js"></script>
 <script src="../js/bot.js"></script>
 <script src="../js/audio.js"></script>

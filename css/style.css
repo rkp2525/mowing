@@ -150,3 +150,7 @@ body.touch .finish.ready { animation: none; }
 .grounds-action { position: absolute; right: 18px; bottom: calc(26px + env(safe-area-inset-bottom)); }
 body.touch .grounds-action { width: 110px; min-height: 76px; font-size: 16px; }
 @media (max-width: 640px) { .grounds-status { top: 108px; left: 12px; font-size: 12px; } }
+
+#hud-precision.on { background: #d6e8a8; outline: 2px solid #668b3c; }
+#hud-precision:disabled { opacity: .45; }
+#hud #precision-status { right: 16px; bottom: calc(116px + env(safe-area-inset-bottom)); position: absolute; pointer-events: none; background: #e4edc2; font-size: 13px; }

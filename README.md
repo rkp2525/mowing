@@ -5,7 +5,7 @@ A cozy top-down lawn mowing game. Start as a kid with a free, quiet reel mower, 
 ## Play
 - **Desktop app:** double-click `Lawn Kid.app` (opens in its own window via Chrome; falls back to your default browser). Or just open `index.html`.
 - **Phone / friends:** deploy this folder to Vercel (`npx vercel --prod`) — it is a plain static site, no build step.
-- Controls: WASD/arrows or hold the left mouse button to steer · **Alt** = creep · **Shift / L / ↔ button = straight-line lock** · Q/E change equipment at the truck · Space scatters fertilizer · +/− zoom · Esc pause. Touch: drag to steer. Mowers cut as you move.
+- Controls: WASD/arrows or hold the left mouse button to steer · **Alt** = creep · **hold Shift = Precision mode** · **L / ↔ = straight-line lock** · Q/E change equipment at the truck · Space scatters fertilizer · +/− zoom · Esc pause. Touch: drag to steer. Mowers cut as you move.
 
 ## Game layers (the foundation for a bigger game)
 - **Tools:** free reel mower → gas mower → riding mower (speed, width, power, turn radius, fuel).
@@ -84,10 +84,20 @@ Capture includes game menus and scrolling, excludes Feedback/Log controls and tr
 
 ## Forgiving steering
 
-**Easy steering** is on by default: all mowers turn directly toward the input and stop immediately when movement is released. Small deviations near horizontal or vertical are gently straightened; deliberate diagonal passes remain possible. Hold **Shift**, press **L**, or use **↔** for a strict straight-line lock. Steady Hands upgrades strengthen line assist and also improve turning in the optional smooth-steering mode.
+**Easy steering** is on by default: all mowers turn directly toward the input and stop immediately when movement is released. Small deviations near horizontal or vertical are gently straightened; deliberate diagonal passes remain possible. Press **L** or use **↔** for a strict straight-line lock. Hold **Shift** for Precision mode instead; it temporarily bypasses line lock and angle snapping. Steady Hands upgrades strengthen line assist and also improve turning in the optional smooth-steering mode.
 
 Open **Pause → Settings** during a job to adjust steering, sound, or art style. Done returns to the paused job. Turning Easy steering off restores the gradual-turning controls. Settings persist across sessions and apply to the current lawn.
 
 ## Precision trimming
 
 Return to the truck and choose **Precision Trimmer** for narrow corners and edges. Walk into position, face the edge, then press **Space** or tap **Trim** once for each snip. It cuts a half-cell-wide patch ahead of you, anchored where the snip starts; walking or holding the button does not repeat cuts. It is free, uses no fuel or stamina, and follows the same partial flower clipping rules. Return to the truck to put it away. The scythe remains retired.
+
+## Precision mode
+
+Hold **Shift** while using a mower or the Precision Trimmer. Movement slows to **30%** of that tool's normal speed, and **A/D** or **left/right** slowly pivot the equipment through the full 360 degrees. **W/S** or **up/down** move forward/backward along the chosen angle. Combine them for a gradual curve. There is no angle snapping in Precision mode; releasing movement stops immediately. Pointer or touch steering first pivots toward the target, then advances. Releasing Shift returns to the normal controls. The 🎯 button provides the same hold-to-use mode on screen, including on touch devices; releasing or canceling it exits the mode.
+
+The **Precision mode · 30% speed** indicator confirms the mode is active. A short shaded strip directly ahead of the blade shows its full cutting width for the next small forward movement. It rotates with the equipment, stops at obstacles, and turns amber when intact flower stems lie in that short path. It has no long aiming line. Pivoting in place with a mower does not cut grass; lining up is safe. Reverse passes record the actual travel direction for stripes, and very slow reel-mower nudges still cut. Trimmer cuts remain manual.
+
+Precision mode is temporary, so it is not stored as a preference. Pausing, changing equipment, losing focus, or opening feedback releases the on-screen hold. **L / ↔** remains the separate normal-mode line lock. Fertilizer keeps its usual walking and Scatter controls.
+
+`node tools/check-precision.js` covers full-circle pivoting at three frame rates, 30% speed, forward/back travel, stopping, precise reel cuts, pointer alignment, blade-path geometry, obstacles, flower warnings, and tool behavior. The browser checks also cover Shift routing, line-lock bypass, and touch hold/cancel.

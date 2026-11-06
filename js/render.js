@@ -574,7 +574,22 @@
     // during a swing the arc is planted at the swing origin; idle previews follow the player
     const X = (s.sw && s.sw.ox !== undefined ? s.sw.ox : p.x) * C, Y = (s.sw && s.sw.oy !== undefined ? s.sw.oy : p.y) * C;
     g.save();
-    if (Tl.id === 'fertilizer') {
+    if (s.precision && M.Precision.available(Tl.id)) {
+      const preview = M.Precision.preview(s), N = M.GRASS_SUBDIV;
+      const radius = preview.far + preview.width / 2;
+      g.beginPath();
+      for (let y = Math.max(0, Math.floor((p.y-radius)*N)); y < Math.min(s.H*N, Math.ceil((p.y+radius)*N)); y++)
+        for (let x = Math.max(0, Math.floor((p.x-radius)*N)); x < Math.min(s.W*N, Math.ceil((p.x+radius)*N)); x++) {
+          const cx = (x+.5)/N, cy = (y+.5)/N;
+          if (s.type[Math.floor(cy)*s.W+Math.floor(cx)] === M.T.GRASS && preview.contains(cx,cy)) g.rect(x*C/N,y*C/N,C/N+.02,C/N+.02);
+        }
+      g.clip(); g.translate(p.x*C,p.y*C); g.rotate(p.heading);
+      g.fillStyle = preview.danger ? 'rgba(245,201,105,.24)' : 'rgba(233,249,192,.22)';
+      g.strokeStyle = preview.danger ? '#f2d482' : '#e7f5ce'; g.lineWidth = .22; g.setLineDash([]);
+      g.fillRect(preview.near*C,-preview.width*C/2,(preview.far-preview.near)*C,preview.width*C);
+      const inset = C/N; // Keep the smooth outline inside the sampled grass mask.
+      g.strokeRect(preview.near*C+inset,-preview.width*C/2+inset,(preview.far-preview.near)*C-2*inset,preview.width*C-2*inset);
+    } else if (Tl.id === 'fertilizer') {
       g.setLineDash([1, 1.4]); g.lineWidth = .25; g.strokeStyle = 'rgba(239,226,183,.55)';
       g.beginPath(); g.arc(X, Y, 1.05 * C, 0, TAU); g.stroke();
     } else if (Tl.id === 'scythe') {
