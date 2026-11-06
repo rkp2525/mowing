@@ -58,7 +58,7 @@
   /* ---------------- input ---------------- */
   let feedbackFrozen = false;
   const keys = {};
-  let spreadQueued = false;
+  let spreadQueued = false, precisionHeld = false;
   const touch = { id: null, ox: 0, oy: 0, x: 0, y: 0, active: false };
   const mouse = { down: false, snip: false, seen: false, x: 0, y: 0 };
   window.addEventListener('keydown', (e) => {
@@ -77,7 +77,7 @@
     } else if ((G.mode === 'paused' || G.mode === 'truck') && (e.code === 'Escape' || e.code === 'KeyP')) resume();
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
-  window.addEventListener('blur', () => { if (feedbackFrozen) return; for (const k in keys) keys[k] = false; mouse.down = false; spreadQueued = false; if (G.mode === 'play') pause(); });
+  window.addEventListener('blur', () => { if (feedbackFrozen) return; for (const k in keys) keys[k] = false; mouse.down = false; spreadQueued = false; precisionHeld = false; if (G.mode === 'play') pause(); });
   document.addEventListener('visibilitychange', () => { if (!feedbackFrozen && document.hidden && G.mode === 'play') pause(); });
 
   cv.addEventListener('pointerdown', (e) => {
@@ -118,8 +118,10 @@
   let kHold = 0, lockToggle = false, lockAxis = null;
   function readInput(dt) {
     let mx = 0, my = 0;
+    const precision = !!G.s && M.Precision.available(G.s.tool) && !!(keys.ShiftLeft || keys.ShiftRight || precisionHeld);
     if (keys.KeyD || keys.ArrowRight) mx += 1; if (keys.KeyA || keys.ArrowLeft) mx -= 1;
     if (keys.KeyS || keys.ArrowDown) my += 1; if (keys.KeyW || keys.ArrowUp) my -= 1;
+    const keyboard = !!(mx || my), forward = -my, turn = mx;
     if (mx || my) {
       const d = Math.hypot(mx, my); kHold += dt;
       // gentle ramp: a tap nudges, holding builds to full speed (fine control near hedges & flowers)
@@ -135,9 +137,9 @@
       const dx = mouse.x - px, dy = mouse.y - py, d = Math.hypot(dx, dy);
       if (d > 16) { const m = clamp((d - 16) / 130, 0.22, 1); mx = dx / d * m; my = dy / d * m; }
     } else kHold = 0;
-    // straight-line lock: snap to the dominant axis (hold Shift or toggle ↔) for perfectly straight stripes
+    // straight-line lock: toggle L or ↔ outside Precision mode for perfectly straight stripes
     const mg = Math.hypot(mx, my);
-    if ((keys.ShiftLeft || keys.ShiftRight || lockToggle) && mg > 0.1) {
+    if (!precision && lockToggle && mg > 0.1) {
       const ax = Math.abs(mx), ay = Math.abs(my);
       if (!lockAxis) lockAxis = ax >= ay ? 'x' : 'y';
       else if (lockAxis === 'x' && ay > ax * 1.6) lockAxis = 'y';
@@ -145,6 +147,8 @@
       if (lockAxis === 'x') { mx = Math.sign(mx) * mg; my = 0; } else { my = Math.sign(my) * mg; mx = 0; }
     } else if (mg <= 0.1) lockAxis = null;
     const act = spreadQueued; spreadQueued = false;
+    if (precision) return { mx: 0, my: 0, act, precision, forward: keyboard ? forward : 0, turn: keyboard ? turn : 0,
+      ...(keyboard || mg <= .1 ? {} : { aim: Math.atan2(my, mx), advance: Math.min(1, mg) }) };
     return { mx, my, act };
   }
 
@@ -153,7 +157,7 @@
   /* ---------------- gameplay flow ---------------- */
   function startLevel(i, toolId) {
     A.init(); applyAudioPrefs();
-    mouse.down = false; spreadQueued = false;
+    mouse.down = false; spreadQueued = false; precisionHeld = false;
     if (toolId === 'fertilizer' || toolId === 'trimmer') toolId = save.tool;
     toolId = M.TOOL_ORDER.includes(toolId) && save.tools[toolId] ? toolId : 'reel';
     G.idx = i; G.s = Sim.create(i, save, toolId); R.bake(G.s);
@@ -179,7 +183,7 @@
     if (!Sim.atTruck(G.s)) { toast('Return to your truck to change equipment.'); return false; }
     if (!Sim.setTool(G.s, id)) { toast('Move to a clear spot by the truck for that mower.'); return false; }
     if (M.TOOL_ORDER.includes(id)) { save.tool = id; persist(); }
-    spreadQueued = false; A.click(); updateHudTool(); computeZ();
+    spreadQueued = false; precisionHeld = false; A.click(); updateHudTool(); computeZ();
     say(id === 'fertilizer' ? 'Walk to a mown rough patch. Press Space or tap Scatter to spread a handful.' : id === 'trimmer' ? 'Walk to an edge or corner. Press Space or tap Trim for each precise snip.' : M.TOOLS[id].name, 5000);
     return true;
   }
@@ -191,7 +195,7 @@
   function showTruck() {
     if (G.mode !== 'play') return;
     if (!Sim.atTruck(G.s)) { toast('Return to your truck to change equipment.'); return; }
-    G.mode = 'truck'; G.s.p.speed = 0; mouse.down = false; spreadQueued = false;
+    G.mode = 'truck'; G.s.p.speed = 0; mouse.down = false; spreadQueued = false; precisionHeld = false;
     for (const key in keys) keys[key] = false;
     touch.active = false; $('joy-base').style.display = 'none'; A.tool(null, 0, false);
     const el = show(`<div class="panel"><h2>Truck · Equipment</h2><p class="sub">Choose a mower, trimmer, or fertilizer for the rough patches. Fertilizer refills are free.</p>
@@ -212,6 +216,7 @@
     $('meter-label').parentElement.style.display = T.powered ? '' : 'none';
     $('btn-fertilize').classList.toggle('hidden', !['fertilizer', 'trimmer'].includes(T.id));
     $('btn-fertilize').textContent = T.id === 'trimmer' ? 'Trim · Space' : 'Scatter · Space';
+    $('hud-precision').disabled = !M.Precision.available(T.id);
     lbl.textContent = T.powered ? 'Fuel' : 'Stamina';
   }
   let hintTimer = 0;
@@ -251,7 +256,7 @@
     }
   }
 
-  function pause() { if (G.mode !== 'play') return; spreadQueued = false; G.mode = 'paused'; A.tool(null, 0, false); A.click(); showPause(); }
+  function pause() { if (G.mode !== 'play') return; spreadQueued = false; precisionHeld = false; G.mode = 'paused'; A.tool(null, 0, false); A.click(); showPause(); }
   function resume() { hideScreens(); G.mode = 'play'; A.click(); }
   function finishJob() {
     const s = G.s; if (!s || G.mode !== 'play') return;
@@ -280,6 +285,9 @@
     const f = $('btn-finish'), can = cov >= 0.8;
     f.classList.toggle('hidden', !can); f.classList.toggle('ready', cov >= 0.97);
     f.textContent = cov >= 0.97 ? '✔ Finish Job' : '✔ Finish early';
+    $('precision-status').classList.toggle('hidden', !s.precision);
+    $('hud-precision').classList.toggle('on', s.precision);
+    $('hud-precision').setAttribute('aria-pressed', String(s.precision));
     const grounds = M.Groundskeeping.progress(s);
     $('grounds-status').textContent = `🌱 ${grounds.restored}/${s.roughPatches.length} patches fed · ${Math.round(grounds.fraction * 100)}%`;
     const T = s.ts, mf = $('meter-fill');
@@ -355,7 +363,7 @@
   function showHow(back_) {
     const el = show(`<div class="panel"><h2>How to Play 🌱</h2><p class="sub">Mow the neighbors' lawns, earn cash, and grow from a kid with a quiet reel mower to the town's best groundskeeper.</p>
       <h3>Move and cut</h3><div class="keys"><div><b>Hold trackpad / mouse click</b></div><div>Slide to steer and walk. Release to stop.</div><div><kbd>W A S D</kbd> / arrows</div><div>Keyboard movement works too. Face where you travel.</div><div>Touch</div><div>Drag to steer. The mower cuts as you move.</div></div>
-      <details class="control-details"><summary>Optional precision controls</summary><div class="keys"><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Space</kbd></div><div>Snip with the trimmer or scatter fertilizer</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Change equipment at the truck</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
+      <details class="control-details"><summary>Optional precision controls</summary><div class="keys"><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd></div><div>Hold for Precision mode: left/right pivot; up/down forward/back at 30% speed</div><div><kbd>L</kbd> / ↔</div><div>Straight-line lock</div><div><kbd>Space</kbd></div><div>Snip with the trimmer or scatter fertilizer</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Change equipment at the truck</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
       <h3>Fine edging</h3><p>Collect the Precision Trimmer at your truck for corners and narrow edges. Walk into position and press <kbd>Space</kbd> or tap <b>Trim</b> for each snip. Flowers still clip only where the blades touch.</p>
       <h3>Help the lawn thrive</h3><p>Mow the pale, rough patches, then return to the truck and take fertilizer. Walk over a rough patch and press <kbd>Space</kbd> or tap <b>Scatter</b> for each handful. Treated grass greens up gently. Lawn feeding is optional and earns a restoration bonus.</p>
       <h3>Get paid for quality</h3><div class="keys"><div>🌿 Coverage</div><div>Mow every blade. Dark thick grass takes two passes without a strong mower.</div><div>📏 Stripes</div><div>Long, straight lines look pro.</div><div>🌷 Care</div><div>Clip flowers carefully: only the amount cut reduces care and pay. Rocks simply block your path. Pick up toys and gnomes.</div><div>⏱ Speed</div><div>Beat the par time.</div><div>⛽ Fuel</div><div>Powered mowers need refueling at the utility truck.</div></div>
@@ -369,7 +377,7 @@
       <label class="art-choice"><input type="radio" name="art-style" value="pixel" ${save.artStyle === 'pixel' ? 'checked' : ''}><span><b>Fine Pixel</b><small>Pixel characters and equipment in our original lush lawns.</small></span></label>
       <label class="art-choice"><input type="radio" name="art-style" value="realism" ${save.artStyle === 'realism' ? 'checked' : ''}><span><b>Textured Realism</b><small>A fully rebuilt world with natural materials and warm summer light.</small></span></label>
       </fieldset><p class="art-status" id="art-status" role="status">Your progress is shared between both styles.</p>
-      <details class="control-details"><summary>Controls</summary><div class="keys"><div><kbd>W A S D</kbd> / arrows</div><div>Move</div><div>Click and hold</div><div>Walk toward the cursor</div><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Space</kbd></div><div>Snip with the trimmer or scatter fertilizer</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Change equipment at the truck</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
+      <details class="control-details"><summary>Controls</summary><div class="keys"><div><kbd>W A S D</kbd> / arrows</div><div>Move</div><div>Click and hold</div><div>Walk toward the cursor</div><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd></div><div>Hold for Precision mode: left/right pivot; up/down forward/back at 30% speed</div><div><kbd>L</kbd> / ↔</div><div>Straight-line lock</div><div><kbd>Space</kbd></div><div>Snip with the trimmer or scatter fertilizer</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Change equipment at the truck</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
       <div class="set-row"><label>Music</label><input type="range" id="s-mus" min="0" max="100" value="${save.music * 100}"></div>
       <div class="set-row"><label>Effects</label><input type="range" id="s-sfx" min="0" max="100" value="${save.sfx * 100}"></div>
       <div class="set-row"><label for="s-steering">Easy steering</label><input type="checkbox" id="s-steering" ${save.easySteering ? 'checked' : ''}></div><p class="note">Easy steering gives direct turns, instant stops, and gentle line assist. Turn it off for smooth, gradual turning.</p>
@@ -528,6 +536,21 @@
   /* ---------------- wire up ---------------- */
   $('hud-pause').onclick = () => pause();
   $('hud-lock').onclick = () => toggleLock();
+  const precisionButton = $('hud-precision');
+  precisionButton.addEventListener('pointerdown', e => {
+    if (G.mode === 'play' && M.Precision.available(G.s.tool)) { precisionHeld = true; precisionButton.setPointerCapture(e.pointerId); }
+    e.preventDefault();
+  });
+  const releasePrecision = () => { precisionHeld = false; };
+  precisionButton.addEventListener('pointerup', releasePrecision); precisionButton.addEventListener('pointercancel', releasePrecision);
+  precisionButton.addEventListener('blur', releasePrecision);
+  precisionButton.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.code === 'Enter') {
+      if (G.mode === 'play' && M.Precision.available(G.s.tool)) precisionHeld = true;
+      e.preventDefault(); e.stopPropagation();
+    }
+  });
+  precisionButton.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'Enter') { releasePrecision(); e.preventDefault(); e.stopPropagation(); } });
   $('hud-tool').onclick = showTruck;
   $('btn-fertilize').addEventListener('pointerdown', e => { if (G.mode === 'play' && ['fertilizer', 'trimmer'].includes(G.s.tool)) spreadQueued = true; e.preventDefault(); });
   $('btn-fertilize').onclick = e => { if (e.detail === 0 && G.mode === 'play' && ['fertilizer', 'trimmer'].includes(G.s.tool)) spreadQueued = true; };
@@ -568,7 +591,7 @@
     freeze: active => {
       feedbackFrozen = active;
       for (const key in keys) keys[key] = false;
-      mouse.down = false; spreadQueued = false; touch.active = false; touch.id = null;
+      mouse.down = false; spreadQueued = false; precisionHeld = false; touch.active = false; touch.id = null;
       if (!active) $('joy-base').style.display = 'none';
       if (active) A.tool(null, 0, false);
     },

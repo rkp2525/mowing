@@ -34,7 +34,7 @@
     const s = {
       lv, W: lv.W, H: lv.H, type: lv.type,
       grass: new Uint8Array(n), subGrass: new Uint8Array(n * M.GRASS_SUBDIV ** 2), subRemaining: new Uint8Array(n), protected: lv.protected, dir: new Uint8Array(n), subDir: new Uint8Array(n * M.GRASS_SUBDIV ** 2), stripePatterns: new Array(n),
-      roughPatches: M.Groundskeeping.create(lv), spreadCool: 0,
+      roughPatches: M.Groundskeeping.create(lv), spreadCool: 0, precision: false,
       dirty: [], remaining: 0, total: lv.total,
       ents: lv.ents.map((e) => Object.assign({}, e, { alive: true, found: false, cd: 0, ...(e.t === 'flower' ? { stems: M.flowerStems(e) } : {}) })),
       p: { x: lv.spawn.x, y: lv.spawn.y, heading: -Math.PI / 2, aimHeading: -Math.PI / 2, speed: 0, step: 0 },
@@ -73,7 +73,7 @@
     s.tool = toolId; s.ts = next;
     s.p.speed = 0;
     s.toolsUsed[toolId] = true;
-    s.sw = null; s.aimPlan = null; s.actWasDown = false; s.trim = toolId === 'trimmer';
+    s.sw = null; s.aimPlan = null; s.actWasDown = false; s.trim = toolId === 'trimmer'; s.precision = false;
     s.fuel = old ? Math.min(s.fuel, s.ts.fuelMax) : s.ts.fuelMax;
     s.stamina = Math.min(s.stamina, s.ts.staminaMax);
     return true;
@@ -181,36 +181,42 @@
     return [Math.floor(p.x - r), Math.floor(p.x + r), Math.floor(p.y - r), Math.floor(p.y + r)];
   }
 
-  /* Advance simulation by dt seconds. inp = {mx,my,act}. Returns event list. */
+  /* Advance simulation by dt seconds. World input: {mx,my,act}. Precision input:
+     {precision,forward,turn} or {precision,aim,advance}; forward/back is local to the heading. */
   function step(s, inp, dt) {
     const ev = [];
     if (s.done) return ev;
     const p = s.p, T = s.ts;
-    const mag = Math.min(1, Math.hypot(inp.mx, inp.my));
+    const mx = inp.mx || 0, my = inp.my || 0;
+    const mag = Math.min(1, Math.hypot(mx, my));
+    const wasPrecision = s.precision;
+    const precision = s.precision = !!inp.precision && M.Precision.available(T.id);
+    const motion = precision && s.stall <= 0 ? M.Precision.resolve(p.heading, inp, dt) : { heading: p.heading, forward: 0 };
     const pressed = !!inp.act && !s.actWasDown;
     s.actWasDown = !!inp.act;
-    if (!s.started && (mag > 0.1 || inp.act)) s.started = true;
+    if (!s.started && (mag > 0.1 || inp.act || (precision && (motion.heading !== p.heading || Math.abs(motion.forward) > .08)))) s.started = true;
     if (s.started) s.time += dt;
 
-    let ta = mag > 0.1 ? Math.atan2(inp.my, inp.mx) : null;
+    let ta = mag > 0.1 ? Math.atan2(my, mx) : null;
     if (s.stall > 0) { s.stall -= dt; ta = null; }
 
     const fuelOut = T.powered && s.fuel <= 0;
     // The body always faces travel. Scythe aiming is separate and assisted.
     const onFoot = T.id === 'scythe' || T.id === 'fertilizer' || T.id === 'trimmer';
     const direct = onFoot || s.save.easySteering !== false;
-    if (!onFoot && direct && ta !== null) {
+    if (!precision && !onFoot && direct && ta !== null) {
       const cardinal = Math.round(ta / (Math.PI / 2)) * Math.PI / 2;
       const tolerance = (12 + 2 * upgradeLv(s.save, 'steer')) * Math.PI / 180;
       if (Math.abs(angDiff(ta, cardinal)) <= tolerance) ta = cardinal;
     }
-    if (ta !== null) {
+    if (precision) p.heading = motion.heading;
+    else if (ta !== null) {
       const d=angDiff(p.heading,ta),maxTurn=T.turn*dt;
       p.heading=direct?ta:p.heading+clamp(d,-maxTurn,maxTurn);
     }
     let alignF = 0;
     if (ta !== null) alignF = direct ? 1 : Math.max(T.id === 'ride' ? .45 : .55, Math.cos(angDiff(p.heading, ta)));
-    let want = T.speed * mag * alignF;
+    let want = precision ? T.speed * Math.abs(motion.forward) * M.Precision.SPEED : T.speed * mag * alignF;
     if (fuelOut) want *= 0.4;
     if (T.id === 'scythe' && s.tired) want *= 0.55;
     if (T.id === 'scythe' && s.sw) want *= s.sw.snip ? 0.85 : 0.6; // plant your feet mid-swing
@@ -225,19 +231,21 @@
     const a = want > p.speed ? T.accel : T.decel;
     p.speed += clamp(want - p.speed, -a * dt, a * dt);
     if (s.stall > 0) p.speed = Math.min(p.speed, 0.4);
-    if (direct && mag <= .1) p.speed = 0; // stop at the stripe endpoint without coasting
+    if (precision) p.speed = Math.min(p.speed, want); // Shift immediately applies the accepted slow speed.
+    if ((precision && Math.abs(motion.forward) <= .08) || (!precision && (direct || wasPrecision) && mag <= .1)) p.speed = 0;
 
     // ---- move with axis-separated collision
     const hx = Math.cos(p.heading), hy = Math.sin(p.heading);
-    const walkH = onFoot && ta !== null ? ta : p.heading;
-    const mvx = Math.cos(walkH) * p.speed * dt, mvy = Math.sin(walkH) * p.speed * dt;
+    const walkH = !precision && onFoot && ta !== null ? ta : p.heading;
+    const travelSign = precision && motion.forward < 0 ? -1 : 1;
+    const mvx = Math.cos(walkH) * p.speed * dt * travelSign, mvy = Math.sin(walkH) * p.speed * dt * travelSign;
     const ox = p.x, oy = p.y;
     if (!collides(s, p.x + mvx, p.y, T.r)) p.x += mvx;
     if (!collides(s, p.x, p.y + mvy, T.r)) p.y += mvy;
     const moved = Math.hypot(p.x - ox, p.y - oy);
     if (moved < p.speed * dt * 0.15 && p.speed > 1) p.speed *= 0.7; // head-on bump (sliding along walls is free)
     p.step += moved * 1.6;
-    s.moving = p.speed > 0.4;
+    s.moving = precision ? moved > 1e-7 : p.speed > 0.4;
 
     // ---- refuel / rest at the truck
     const nearTruck = atTruck(s);
@@ -248,7 +256,7 @@
     if (nearTruck) s.stamina = Math.min(T.staminaMax, s.stamina + 25 * dt);
 
     // ---- tool logic
-    let dc = dirCode(p.heading);
+    let dc = dirCode(p.heading + (travelSign < 0 ? Math.PI : 0));
     let cutN = 0, engineOn = false, cutting = false;
     if (T.id === 'scythe') {
       s.swCool -= dt;
@@ -305,10 +313,11 @@
       if (s.fuel > 0) s.fuelOutNoted = false;
       cutting = engineOn;
     } else { // reel
-      cutting = s.stall <= 0 && p.speed > 0.6;
+      cutting = s.stall <= 0 && (precision ? moved > 1e-7 : p.speed > 0.6);
     }
     // scythe grass direction (stripe scoring) follows the swing, not the body's last travel direction
     if (T.id === 'scythe' || T.id === 'trimmer') dc = dirCode(s.sw ? s.sw.a0 : p.aimHeading);
+    if (precision && M.TOOL_ORDER.includes(T.id) && moved <= 1e-7) cutting = false;
     s.cutting = cutting; s.engine = engineOn;
 
     const fp = cutting ? makeFootprint(s) : null;
@@ -409,5 +418,5 @@
     return { cov, covN, pattern, care, speed, score: sc, stars, payBase: Math.round(payBase), bonusGnome, bonusToy, bonusGrounds, grounds, fines, cardsMult: mult, pay, time: s.time, mowingTime };
   }
 
-  M.Sim = { create, step, setTool, atTruck, coverage, score, toolStats, collides, DIR, dirCode, upgradeLv, blockedCell, scytheMode, makeFootprint, grassPattern, stripePatterns };
+  M.Sim = { create, step, setTool, atTruck, coverage, score, toolStats, collides, bladeClear, DIR, dirCode, upgradeLv, blockedCell, scytheMode, makeFootprint, grassPattern, stripePatterns };
 })();

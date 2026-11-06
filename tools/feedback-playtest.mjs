@@ -169,7 +169,46 @@ try {
     assert.deepEqual(errors, []);
     console.log(`${width}px PASS: capture, frozen state, truck menu, storage, selected export, sessions, Trash/Undo/Restore, reload, offline, and failure recovery`);
   }
+  // Drive the approved Precision controls through real browser keyboard and pointer events.
+  for (const width of [1280, 390]) {
+    const errorStart = events.length;
+    await command('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: width < 500 });
+    await command('Emulation.setTouchEmulationEnabled', { enabled: width < 500, maxTouchPoints: 2 });
+    await command('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/?level=1&tool=reel&shot=1` });
+    await until(`!!window.__G?.s && !!MOW.Precision && MOW.ArtStyles.ready('pixel')`);
+    await evaluate(`__G.s.p.x=__G.s.lv.spawn.x-6;__G.s.p.y=__G.s.lv.spawn.y-4;__G.s.p.heading=-Math.PI/2;__G.s.p.speed=0;window.precisionStart={x:__G.s.p.x,y:__G.s.p.y,remaining:__G.s.remaining}`);
+    await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Shift', code: 'ShiftLeft', modifiers: 8 });
+    await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'D', code: 'KeyD', modifiers: 8 });
+    await until(`__G.s.p.heading > -1`);
+    await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'D', code: 'KeyD', modifiers: 8 });
+    await until(`!document.querySelector('#precision-status').classList.contains('hidden')`);
+    assert.equal(await evaluate(`__G.s.precision && __G.s.p.x===precisionStart.x && __G.s.p.y===precisionStart.y && __G.s.remaining===precisionStart.remaining`), true);
+    assert.equal(await evaluate(`document.querySelector('#hud-precision').getAttribute('aria-pressed')`), 'true');
+    await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'W', code: 'KeyW', modifiers: 8 });
+    await until(`Math.hypot(__G.s.p.x-precisionStart.x,__G.s.p.y-precisionStart.y)>.25`);
+    assert.ok(await evaluate(`__G.s.p.speed <= __G.s.ts.speed*.30 + 1e-8`));
+    await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'W', code: 'KeyW', modifiers: 8 });
+    await until(`__G.s.p.speed===0`);
+    await screenshot(`precision-${width}-pixel.png`);
+    await evaluate(`MOW.ArtStyles.setStyle('realism')`);
+    await until(`MOW.ArtStyles.active==='realism' && MOW.ArtStyles.ready('realism')`);
+    // Wait for the scene to render at least once with the selected production renderer.
+    await evaluate(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+    await screenshot(`precision-${width}-realism.png`);
+    await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Shift', code: 'ShiftLeft' });
+    await until(`!__G.s.precision && document.querySelector('#precision-status').classList.contains('hidden')`);
+    const hold = await evaluate(`(()=>{const r=document.querySelector('#hud-precision').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+    if(width<500)await command('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...hold, id: 1 }] });
+    else await command('Input.dispatchMouseEvent', { type: 'mousePressed', ...hold, button: 'left', clickCount: 1 });
+    await until(`__G.s.precision`);
+    if(width<500)await command('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+    else await command('Input.dispatchMouseEvent', { type: 'mouseReleased', ...hold, button: 'left', clickCount: 1 });
+    await until(`!__G.s.precision`);
+    assert.deepEqual(events.slice(errorStart).filter(event=>event.method==='Runtime.exceptionThrown'), []);
+    console.log(`${width}px PASS: real Shift pivot, 30% travel, immediate stop, mode indicator, release, on-screen hold/cancel, and both art styles`);
+  }
   // Exercise the production input and pause/settings handlers with the shared browser fixture.
+  await command('Emulation.setTouchEmulationEnabled', { enabled: false });
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
   await command('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/tools/control-browser.html?level=1&controlcheck=1&shot=1` });
   await until(`!!document.querySelector('pre[data-result]')`);

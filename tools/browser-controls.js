@@ -31,6 +31,26 @@
     check(s.p.x === stopX && s.p.y === stopY, 'released mower settles and stays stopped');
     key('keydown', 'KeyC'); key('keyup', 'KeyC'); key('keydown', 'Space'); frames(30); key('keyup', 'Space');
     check(!s.trim && !s.sw && s.tool === 'reel', 'C and Space cannot enable retired tools');
+    s.p.x = s.p.y = 15.5; s.p.heading = .371; s.p.speed = 0;
+    key('keydown','KeyL');key('keyup','KeyL'); // The normal line lock must not snap a Precision pivot.
+    const pivotX=s.p.x,pivotY=s.p.y;
+    key('keydown','ShiftLeft');key('keydown','KeyD');frames(30);key('keyup','KeyD');
+    check(s.precision && Math.abs(s.p.heading-(.371+MOW.Precision.TURN_RATE*.5))<1e-8 && s.p.x===pivotX && s.p.y===pivotY, 'Shift makes left/right pivot continuously in place, even with line lock enabled');
+    const heading=s.p.heading;
+    key('keydown','KeyW');frames(30);key('keyup','KeyW');frames(1);
+    check(s.p.x>pivotX && s.p.y>pivotY && Math.abs(s.p.heading-heading)<1e-8 && s.p.speed===0, 'Precision forward follows the selected angle and stops on release');
+    key('keyup','ShiftLeft');frames(1);check(!s.precision, 'releasing Shift exits Precision mode');
+    key('keydown','KeyL');key('keyup','KeyL');
+    const precisionButton=document.querySelector('#hud-precision'),precisionCapture=precisionButton.setPointerCapture;
+    precisionButton.setPointerCapture=()=>{};
+    precisionButton.dispatchEvent(new PointerEvent('pointerdown',{pointerType:'touch',pointerId:7,bubbles:true}));frames(1);
+    check(s.precision, 'holding the on-screen Precision button activates the same mode');
+    precisionButton.dispatchEvent(new PointerEvent('pointercancel',{pointerType:'touch',pointerId:7,bubbles:true}));frames(1);
+    check(!s.precision, 'canceling the on-screen hold releases Precision mode');precisionButton.setPointerCapture=precisionCapture;
+    precisionButton.dispatchEvent(new KeyboardEvent('keydown',{code:'Space',bubbles:true}));frames(1);
+    check(s.precision, 'keyboard activation can hold the on-screen Precision control');
+    precisionButton.dispatchEvent(new KeyboardEvent('keyup',{code:'Space',bubbles:true}));frames(1);
+    check(!s.precision, 'keyboard release exits the on-screen Precision hold');
     const capture = cv.setPointerCapture; cv.setPointerCapture = () => {};
     const before = s.p.x;
     cv.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'mouse', pointerId: 1, button: 0, buttons: 1, clientX: 10, clientY: 400, bubbles: true }));

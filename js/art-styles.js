@@ -101,12 +101,13 @@
       const reach=tool==='ride'?0:(s.ts.r+.35)*C;
       const deckRatio={pixel:{reel:.54296875,gas:.47265625,ride:.76},realism:{reel:.4921875,gas:.421875,ride:.76}};
       const size=s.ts.width*C/deckRatio[active][tool],cx=x+Math.cos(h)*reach,cy=y+Math.sin(h)*reach;
-      if(tool==='ride') frame(g,gear,8,3,dir,r,cx,cy,size,size,.5,.61);
+      const residual=s.precision?Math.atan2(Math.sin(h-dir*Math.PI/4),Math.cos(h-dir*Math.PI/4)):0;
+      if(tool==='ride') { g.save();g.translate(cx,cy);g.rotate(residual);frame(g,gear,8,3,dir,r,0,0,size,size,.5,.61);g.restore(); }
       else {
         // Use the rendered chassis, then attach a real handle to the operator's
         // hands. It follows the exact heading instead of an atlas approximation.
         const sw=gear.naturalWidth/8,sh=gear.naturalHeight/3;
-        g.drawImage(gear,dir*sw,(r+.53)*sh,sw,sh*.47,cx-size/2,cy-size*.235,size,size*.47);
+        g.save();g.translate(cx,cy);g.rotate(residual);g.drawImage(gear,dir*sw,(r+.53)*sh,sw,sh*.47,-size/2,-size*.235,size,size*.47);g.restore();
         const hx=Math.cos(h),hy=Math.sin(h),px=-hy,py=hx;
         const grip=[x+hx*1.1,y-5.8+hy*.5];
         for(const sign of [-1,1]){

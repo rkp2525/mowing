@@ -6,7 +6,8 @@
 <header><div><h1>Lawn Kid / Summer afternoons</h1><p>Backyard lawns · faded cotton · weathered cedar · worn paving</p></div>
 <label>Lawn <select id="level"></select></label><label>Tool <select id="tool"></select></label><label>Art <select id="art"><option value="pixel">Fine Pixel</option><option value="realism">Textured Realism</option></select></label><label>Cut <input id="cut" type="range" min="0" max="100" value="35"></label><button id="motion">Pause motion</button><a href="../index.html">Play game ↗</a></header>
 <main><canvas id="scene"></canvas><p class="note">Live game renderer. The strip below checks every tool in eight directions, including walking, idle, swing, tired, and stalled poses.</p><canvas id="cast"></canvas></main>
-<script src="../js/data.js"></script><script src="../js/groundskeeping.js"></script><script src="../js/sim.js"></script><script src="../js/sprites_nature.js"></script><script src="../js/sprites_player.js"></script><script src="../js/sprites_build.js"></script><script src="../js/render.js"></script><script src="../js/art-styles.js"></script>
+<script src="../js/data.js"></script><script src="../js/groundskeeping.js"></script><script src="../js/precision.js"></script>
+<script src="../js/sim.js"></script><script src="../js/sprites_nature.js"></script><script src="../js/sprites_player.js"></script><script src="../js/sprites_build.js"></script><script src="../js/render.js"></script><script src="../js/art-styles.js"></script>
 <script>
 const M=MOW, scene=document.querySelector('#scene'), cast=document.querySelector('#cast'), level=document.querySelector('#level'), tool=document.querySelector('#tool'), cut=document.querySelector('#cut');
 M.LEVELS.forEach((l,i)=>level.add(new Option((i+1)+' · '+l.name,i)));M.TOOL_ORDER.forEach(t=>tool.add(new Option(M.TOOLS[t].name,t)));
