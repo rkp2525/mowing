@@ -406,7 +406,15 @@
     el.querySelector('#s-sfx').onchange = () => A.coin();
     el.querySelector('#s-steering').onchange = e => { save.easySteering = e.target.checked; persist(); };
     el.querySelector('#s-mute').onchange = (e) => { save.muted = e.target.checked; applyAudioPrefs(); persist(); };
-    btn(el, '#b-reset', () => { if (confirm('Erase all progress and start over?')) { const keep = { music: save.music, sfx: save.sfx, muted: save.muted, artStyle: save.artStyle, easySteering: save.easySteering }; save = Object.assign(defSave(), keep); persist(); A.error(); back_(); } });
+    btn(el, '#b-reset', () => {
+      if (!confirm('Erase all progress and start over?')) return;
+      const keep = { music: save.music, sfx: save.sfx, muted: save.muted, artStyle: save.artStyle, easySteering: save.easySteering };
+      save = Object.assign(defSave(), keep); persist();
+      // A paused job still references the old save: discard it before leaving Settings.
+      G.s = null; mouse.down = false; spreadQueued = false; touch.active = false;
+      for (const key in keys) keys[key] = false;
+      $('joy-base').style.display = 'none'; A.tool(null, 0, false); A.error(); showBoard();
+    });
     btn(el, '#b-ok', () => { A.click(); back_(); });
   }
 

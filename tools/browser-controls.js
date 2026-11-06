@@ -96,6 +96,14 @@
     check(document.querySelector('#screens').textContent.includes('Lawn feeding'), 'results include the restoration cash bonus');
     document.querySelector('#b-rt').click();
     check(window.__G.s.tool === 'reel' && MOW.Groundskeeping.progress(window.__G.s).treated === 0, 'retry from fertilizer restores the saved mower and fresh patches');
+    if (!new URLSearchParams(location.search).has('truckreview')) {
+      document.querySelector('#hud-pause').click(); document.querySelector('#b-settings').click();
+      const confirmReset = window.confirm; window.confirm = () => true;
+      document.querySelector('#b-reset').click(); window.confirm = confirmReset;
+      check(window.__G.s === null && window.__G.mode === 'board', 'mid-level reset discards the old job');
+      key('keydown', 'Escape'); key('keyup', 'Escape');
+      check(window.__G.s === null && !document.querySelector('#b-res'), 'discarded job cannot resume');
+    }
     output.dataset.result = 'PASS'; output.textContent += '\n\nBROWSER CONTROL CHECK PASSED';
     if (new URLSearchParams(location.search).has('truckreview')) {
       output.style.display = 'none'; document.body.classList.add('touch');
