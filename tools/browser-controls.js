@@ -40,10 +40,24 @@
     frames(20); cv.setPointerCapture = capture;
     document.querySelector('#hud-pause').click();
     check(!document.querySelector('#s-guide'), 'pause has no retired scythe setting');
+    const pausedState = JSON.stringify({p:s.p,time:s.time,remaining:s.remaining});
+    document.querySelector('#b-settings').click();
+    check(document.querySelector('#s-steering').checked, 'easy steering is on by default in mid-level settings');
+    document.querySelector('#s-steering').click();
+    check(s.save.easySteering === false, 'steering preference applies to the active job');
+    document.querySelector('#s-steering').click();
+    document.querySelector('#b-ok').click();
+    check(window.__G.mode === 'paused' && JSON.stringify({p:s.p,time:s.time,remaining:s.remaining}) === pausedState, 'settings return to pause with the job unchanged');
     document.querySelector('#b-res').click();
     s.p.x = s.lv.spawn.x; s.p.y = s.lv.spawn.y;
     document.querySelector('#hud-tool').click();
     check(window.__G.mode === 'truck' && document.querySelector('[data-gear="fertilizer"]'), 'truck offers fertilizer alongside owned mowers');
+    document.querySelector('[data-gear="trimmer"]').click();
+    check(s.tool === 'trimmer' && document.querySelector('#btn-fertilize').textContent.includes('Trim'), 'truck offers a standalone precision trimmer');
+    const trimmedBefore = s.remaining;
+    key('keydown','Space');frames(30);key('keyup','Space');frames(1);
+    check(s.remaining < trimmedBefore && !s.sw, 'manual trimmer action cuts without restoring the scythe');
+    document.querySelector('#hud-tool').click();
     document.querySelector('[data-gear="fertilizer"]').click();
     check(s.tool === 'fertilizer' && window.__G.mode === 'play' && !document.querySelector('#btn-fertilize').classList.contains('hidden'), 'fertilizer pickup returns to lawn with Scatter action');
     s.subGrass.fill(0); s.subRemaining.fill(0); s.grass.fill(0); s.remaining = 0;
@@ -62,6 +76,14 @@
     check(document.querySelector('#screens').textContent.includes('Lawn feeding'), 'results include the restoration cash bonus');
     document.querySelector('#b-rt').click();
     check(window.__G.s.tool === 'reel' && MOW.Groundskeeping.progress(window.__G.s).treated === 0, 'retry from fertilizer restores the saved mower and fresh patches');
+    if (!new URLSearchParams(location.search).has('truckreview')) {
+      document.querySelector('#hud-pause').click(); document.querySelector('#b-settings').click();
+      const confirmReset = window.confirm; window.confirm = () => true;
+      document.querySelector('#b-reset').click(); window.confirm = confirmReset;
+      check(window.__G.s === null && window.__G.mode === 'board', 'mid-level reset discards the old job');
+      key('keydown', 'Escape'); key('keyup', 'Escape');
+      check(window.__G.s === null && !document.querySelector('#b-res'), 'discarded job cannot resume');
+    }
     output.dataset.result = 'PASS'; output.textContent += '\n\nBROWSER CONTROL CHECK PASSED';
     if (new URLSearchParams(location.search).has('truckreview')) {
       output.style.display = 'none'; document.body.classList.add('touch');

@@ -61,7 +61,12 @@
     speed: 3.8, turn: 16, accel: 18, decel: 40, power: 0, width: 0, r: .35,
     desc: 'A bag of lawn feed. Walk to mown rough patches and scatter a handful.',
   };
-  M.EQUIPMENT_ORDER = [...M.TOOL_ORDER, 'fertilizer'];
+  M.TOOLS.trimmer = {
+    id: 'trimmer', name: 'Precision Trimmer', icon: '✂️', price: 0, powered: false,
+    speed: 3.2, turn: 16, accel: 18, decel: 40, power: 1, width: .5, cutDepth: .22, r: .35,
+    desc: 'Hand shears for corners and fine edging. Press Space for each careful snip.',
+  };
+  M.EQUIPMENT_ORDER = [...M.TOOL_ORDER, 'trimmer', 'fertilizer'];
 
   // Retired equipment is kept for future experiments, outside the playable tools.
   M.RETIRED_TOOLS = {
@@ -81,8 +86,8 @@
       desc: ['+7% speed, more stamina', '+14% speed, more stamina', '+21% speed, tons of stamina'] },
     { id: 'tank', name: 'Bigger Fuel Tank', icon: '🛢️', costs: [30, 70, 150],
       desc: ['+40 fuel capacity', '+80 fuel capacity', '+120 fuel & faster refuel'] },
-    { id: 'steer', name: 'Smooth Steering', icon: '🎯', costs: [30, 75, 160],
-      desc: ['+18% turning', '+36% turning', '+54% turning'] },
+    { id: 'steer', name: 'Steady Hands', icon: '🎯', costs: [30, 75, 160],
+      desc: ['Stronger line assist and quicker smooth turns', 'Even steadier lines and smoother handling', 'Maximum line assist and quickest smooth turns'] },
     { id: 'eyes', name: 'Eagle Eyes', icon: '🕶️', costs: [20, 55, 120],
       desc: ['Shows missed patches near the end', 'Shows them earlier', 'Spot every missed patch'] },
     { id: 'cards', name: 'Business Cards', icon: '💼', costs: [35, 90, 200],

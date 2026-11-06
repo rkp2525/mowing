@@ -41,7 +41,7 @@ The backyard art pass uses a neighborhood kid in faded summer clothes, connected
 
 Open [the ten-style character gallery](mockups/character-styles.html) for the latest concepts, each with a matching truck. The selected Fine Pixel and Textured Realism directions are now implemented with separate production sprites and a saved art-style setting.
 
-`node tools/check-mowing.js` checks partial flower clipping, persistent damage, proportional scoring, neutral rock collisions, and starter equipment migration. The old scythe/trimmer simulation and art remain dormant for future experiments; they are excluded from playable equipment. Job times and payouts may need tuning after a human playtest with the reel mower start.
+`node tools/check-mowing.js` checks partial flower clipping, persistent damage, proportional scoring, neutral rock collisions, and starter equipment migration. The scythe remains dormant; the Precision Trimmer is available separately at the truck for manual edging. Job times and payouts may need tuning after a human playtest with the reel mower start.
 
 ## Two playable art styles
 
@@ -66,3 +66,28 @@ Every lawn includes two to five rough patches with pale grass and exposed soil. 
 Fertilizer and refills are free. Only mown, untreated rough grass within reach receives feed; healthy lawn and flowers are unaffected. Fed grass greens up over five seconds. The HUD tracks feeding, and treatment earns a proportional bonus of up to 10% of the job's base rate. Groundskeeping is optional. The speed-rating clock freezes when the lawn reaches 97% mowed, so feeding afterward does not lower the mowing score. New jobs restore the original rough patches.
 
 `node tools/check-groundskeeping.js` checks patch placement across all ten lawns, truck-only equipment changes, manual local spreading, mowing requirements, growth, and flower safety. `tools/gentle-review.html` compares flowers, stripes, and rough-patch restoration in both production renderers.
+
+## Player feedback
+
+Use **Feedback** and **Log** in the bottom-left corner, including while the truck menu, pause screen, or results are open. Feedback captures the visible lawn and UI before opening a note dialog. Choose a category, write a note, and save it (or press Command/Ctrl+Enter). Closing feedback restores the previous screen and focus. Mower movement, game time, camera, particles, and grass stay frozen while capturing, writing, or reviewing feedback; controls resume with held inputs released.
+
+The Log groups notes into sessions and opens the most recent session with its entries selected. Sessions persist across reloads; a new session starts after 30 minutes without a saved note, or with **Start new session**. Uncheck anything you do not want to share, then choose **Download selected** to export one chronological JSON bundle. Each entry shows the lawn, equipment, game screen, art style, category, and capture time. Reports contain an embedded PNG when available, portable simulation arrays (including flower clipping and patch treatment), progress, camera/viewport details, and the note.
+
+**Delete selected** and **Delete entry** move notes to Trash. Undo and Restore recover them; deleted notes stay out of exports. Downloads keep the original notes in Log. Collecting or exporting feedback does not approve or trigger game changes.
+
+Reports live in the separate `lawnkid-feedback` IndexedDB database on this browser, not in the game-progress save. There is no upload or feedback server. Browser-data clearing removes local reports, so download ones you want to keep. If storage fails, your draft remains open with **Download instead** available. If a screenshot cannot be captured, you can still save or download the note and context; the dialog states that the image is missing. Direct `file://` pages may restrict canvas screenshots; the desktop app serves the game locally and supports full capture.
+
+Capture includes game menus and scrolling, excludes Feedback/Log controls and transient toasts, and needs no screen-sharing prompt or external capture library. Already loaded game assets support offline capture. Browser chrome is excluded; web fonts and browser-specific effects may render slightly differently.
+
+- `node tools/check-feedback.js` — session/export logic and portable Mowing snapshots.
+- `node tools/feedback-playtest.mjs` — isolated Chrome acceptance checks at desktop and phone widths: capture image content, frozen active mowing, menus, persistence, sessions, selected downloads, Trash/Undo/Restore, offline capture, and failure recovery. It starts a temporary local server and prints the location of screenshots and exported test reports. Requires Google Chrome on macOS; no npm dependencies.
+
+## Forgiving steering
+
+**Easy steering** is on by default: all mowers turn directly toward the input and stop immediately when movement is released. Small deviations near horizontal or vertical are gently straightened; deliberate diagonal passes remain possible. Hold **Shift**, press **L**, or use **↔** for a strict straight-line lock. Steady Hands upgrades strengthen line assist and also improve turning in the optional smooth-steering mode.
+
+Open **Pause → Settings** during a job to adjust steering, sound, or art style. Done returns to the paused job. Turning Easy steering off restores the gradual-turning controls. Settings persist across sessions and apply to the current lawn.
+
+## Precision trimming
+
+Return to the truck and choose **Precision Trimmer** for narrow corners and edges. Walk into position, face the edge, then press **Space** or tap **Trim** once for each snip. It cuts a half-cell-wide patch ahead of you, anchored where the snip starts; walking or holding the button does not repeat cuts. It is free, uses no fuel or stamina, and follows the same partial flower clipping rules. Return to the truck to put it away. The scythe remains retired.

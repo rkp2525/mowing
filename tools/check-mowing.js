@@ -26,7 +26,7 @@ test('Free reel mower replaces retired equipment without losing progress', () =>
   save.tool = 'gas'; M.normalizeEquipment(save); assert.equal(save.tool, 'gas');
   assert.equal(M.TOOLS.reel.price, 0); assert.equal(M.TOOLS.scythe, undefined);
   assert.equal(M.Sim.create(0, {}).tool, 'reel');
-  for (const id of ['scythe', 'trimmer', 'unknown']) {
+  for (const id of ['scythe', 'unknown']) {
     const s = lawn(id); assert.equal(s.tool, 'reel');
     M.Sim.setTool(s, id); assert.equal(s.tool, 'reel');
     assert.ok(!run(s, 80, { act: true, snip: true, hold: true }).some(e => ['swing', 'snip'].includes(e.e)));

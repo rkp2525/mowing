@@ -8,10 +8,11 @@
 
   /* ---------------- save ---------------- */
   const KEY = 'lawnkid.v1';
-  const defSave = () => ({ money: 0, stars: [], best: [], tools: { reel: true }, tool: 'reel', upgrades: {}, music: 0.7, sfx: 0.85, muted: false, seenHow: false, artStyle: 'pixel' });
+  const defSave = () => ({ money: 0, stars: [], best: [], tools: { reel: true }, tool: 'reel', upgrades: {}, music: 0.7, sfx: 0.85, muted: false, seenHow: false, artStyle: 'pixel', easySteering: true });
   let save = defSave();
   try { Object.assign(save, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* private mode etc. */ }
   M.normalizeEquipment(save);
+  save.easySteering = save.easySteering !== false;
   save.artStyle = save.artStyle === 'realism' ? 'realism' : 'pixel';
   if (DEV && params.has('art')) save.artStyle = params.get('art') === 'realism' ? 'realism' : 'pixel';
   M.ArtStyles.setStyle(save.artStyle).catch(e => console.warn(e.message));
@@ -55,16 +56,17 @@
   }
 
   /* ---------------- input ---------------- */
+  let feedbackFrozen = false;
   const keys = {};
   let spreadQueued = false;
   const touch = { id: null, ox: 0, oy: 0, x: 0, y: 0, active: false };
   const mouse = { down: false, snip: false, seen: false, x: 0, y: 0 };
   window.addEventListener('keydown', (e) => {
-    if (['INPUT', 'SELECT'].includes(e.target.tagName)) return;
+    if (feedbackFrozen || ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
     keys[e.code] = true;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if (G.mode === 'play') {
-      if (e.code === 'Space' && !e.repeat && G.s?.tool === 'fertilizer') spreadQueued = true;
+      if (e.code === 'Space' && !e.repeat && ['fertilizer', 'trimmer'].includes(G.s?.tool)) spreadQueued = true;
       if (e.code === 'Escape' || e.code === 'KeyP') pause();
       else if (e.code === 'KeyQ' || e.code === 'Tab') { e.preventDefault(); cycleTool(1); }
       else if (e.code === 'KeyE') cycleTool(-1);
@@ -75,8 +77,8 @@
     } else if ((G.mode === 'paused' || G.mode === 'truck') && (e.code === 'Escape' || e.code === 'KeyP')) resume();
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
-  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; spreadQueued = false; if (G.mode === 'play') pause(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && G.mode === 'play') pause(); });
+  window.addEventListener('blur', () => { if (feedbackFrozen) return; for (const k in keys) keys[k] = false; mouse.down = false; spreadQueued = false; if (G.mode === 'play') pause(); });
+  document.addEventListener('visibilitychange', () => { if (!feedbackFrozen && document.hidden && G.mode === 'play') pause(); });
 
   cv.addEventListener('pointerdown', (e) => {
     if (G.mode !== 'play') return;
@@ -152,7 +154,7 @@
   function startLevel(i, toolId) {
     A.init(); applyAudioPrefs();
     mouse.down = false; spreadQueued = false;
-    if (toolId === 'fertilizer') toolId = save.tool;
+    if (toolId === 'fertilizer' || toolId === 'trimmer') toolId = save.tool;
     toolId = M.TOOL_ORDER.includes(toolId) && save.tools[toolId] ? toolId : 'reel';
     G.idx = i; G.s = Sim.create(i, save, toolId); R.bake(G.s);
     G.mode = 'play'; G.paused = false; G.res = null; G.toldFuel = false;
@@ -172,13 +174,13 @@
     for (let t = 0; t < sec; t += 1 / 30) { Sim.step(G.s, G.bot.input(1 / 30), 1 / 30); if (G.s.remaining < G.s.total * 0.02) break; }
     G.s.dirty.length = 0; R.bake(G.s); followCam(G.s, 0, true);
   }
-  const truckTools = () => [...M.TOOL_ORDER.filter(t => save.tools[t]), 'fertilizer'];
+  const truckTools = () => [...M.TOOL_ORDER.filter(t => save.tools[t]), 'trimmer', 'fertilizer'];
   function equipTool(id) {
     if (!Sim.atTruck(G.s)) { toast('Return to your truck to change equipment.'); return false; }
     if (!Sim.setTool(G.s, id)) { toast('Move to a clear spot by the truck for that mower.'); return false; }
     if (M.TOOL_ORDER.includes(id)) { save.tool = id; persist(); }
     spreadQueued = false; A.click(); updateHudTool(); computeZ();
-    say(id === 'fertilizer' ? 'Walk to a mown rough patch. Press Space or tap Scatter to spread a handful.' : M.TOOLS[id].name, 5000);
+    say(id === 'fertilizer' ? 'Walk to a mown rough patch. Press Space or tap Scatter to spread a handful.' : id === 'trimmer' ? 'Walk to an edge or corner. Press Space or tap Trim for each precise snip.' : M.TOOLS[id].name, 5000);
     return true;
   }
   function cycleTool(dir) {
@@ -192,7 +194,7 @@
     G.mode = 'truck'; G.s.p.speed = 0; mouse.down = false; spreadQueued = false;
     for (const key in keys) keys[key] = false;
     touch.active = false; $('joy-base').style.display = 'none'; A.tool(null, 0, false);
-    const el = show(`<div class="panel"><h2>Truck · Equipment</h2><p class="sub">Choose a mower, or grab fertilizer for the rough patches. Fertilizer refills are free.</p>
+    const el = show(`<div class="panel"><h2>Truck · Equipment</h2><p class="sub">Choose a mower, trimmer, or fertilizer for the rough patches. Fertilizer refills are free.</p>
       <div class="truck-tools">${truckTools().map(id => `<button class="big-btn ${G.s.tool === id ? '' : 'ghost'}" data-gear="${id}">${M.TOOLS[id].icon} ${M.TOOLS[id].name}${G.s.tool === id ? ' · In hand' : ''}</button>`).join('')}</div>
       <p class="note" id="truck-status" role="status">Equipment changes happen here at the truck.</p><div class="row end"><button class="big-btn ghost" id="b-back">Back to lawn</button></div></div>`, 'dim');
     el.querySelectorAll('[data-gear]').forEach(button => button.onclick = () => {
@@ -208,7 +210,8 @@
     $('hud-tool-icon').textContent = T.icon; $('hud-tool-name').textContent = T.name;
     const lbl = $('meter-label');
     $('meter-label').parentElement.style.display = T.powered ? '' : 'none';
-    $('btn-fertilize').classList.toggle('hidden', T.id !== 'fertilizer');
+    $('btn-fertilize').classList.toggle('hidden', !['fertilizer', 'trimmer'].includes(T.id));
+    $('btn-fertilize').textContent = T.id === 'trimmer' ? 'Trim · Space' : 'Scatter · Space';
     lbl.textContent = T.powered ? 'Fuel' : 'Stamina';
   }
   let hintTimer = 0;
@@ -286,6 +289,7 @@
   }
 
   function update(dt) {
+    if (feedbackFrozen) return;
     G.t += dt;
     if (G.mode === 'play') {
       const s = G.s;
@@ -310,6 +314,7 @@
   }
 
   function render() {
+    if (feedbackFrozen) return;
     const s = G.mode === 'title' || G.mode === 'board' ? G.demo : G.s;
     if (!s || !s.bake) { ctx.fillStyle = '#2b5a3a'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
     if (!M.ArtStyles.ready(M.ArtStyles.active)) {
@@ -350,7 +355,8 @@
   function showHow(back_) {
     const el = show(`<div class="panel"><h2>How to Play 🌱</h2><p class="sub">Mow the neighbors' lawns, earn cash, and grow from a kid with a quiet reel mower to the town's best groundskeeper.</p>
       <h3>Move and cut</h3><div class="keys"><div><b>Hold trackpad / mouse click</b></div><div>Slide to steer and walk. Release to stop.</div><div><kbd>W A S D</kbd> / arrows</div><div>Keyboard movement works too. Face where you travel.</div><div>Touch</div><div>Drag to steer. The mower cuts as you move.</div></div>
-      <details class="control-details"><summary>Optional precision controls</summary><div class="keys"><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Space</kbd></div><div>Scatter a handful of fertilizer</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Change equipment at the truck</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
+      <details class="control-details"><summary>Optional precision controls</summary><div class="keys"><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Space</kbd></div><div>Snip with the trimmer or scatter fertilizer</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Change equipment at the truck</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
+      <h3>Fine edging</h3><p>Collect the Precision Trimmer at your truck for corners and narrow edges. Walk into position and press <kbd>Space</kbd> or tap <b>Trim</b> for each snip. Flowers still clip only where the blades touch.</p>
       <h3>Help the lawn thrive</h3><p>Mow the pale, rough patches, then return to the truck and take fertilizer. Walk over a rough patch and press <kbd>Space</kbd> or tap <b>Scatter</b> for each handful. Treated grass greens up gently. Lawn feeding is optional and earns a restoration bonus.</p>
       <h3>Get paid for quality</h3><div class="keys"><div>🌿 Coverage</div><div>Mow every blade. Dark thick grass takes two passes without a strong mower.</div><div>📏 Stripes</div><div>Long, straight lines look pro.</div><div>🌷 Care</div><div>Clip flowers carefully: only the amount cut reduces care and pay. Rocks simply block your path. Pick up toys and gnomes.</div><div>⏱ Speed</div><div>Beat the par time.</div><div>⛽ Fuel</div><div>Powered mowers need refueling at the utility truck.</div></div>
       <div class="row end" style="margin-top:14px"><button class="big-btn" id="b-ok">Got it!</button></div></div>`, 'dim');
@@ -363,9 +369,10 @@
       <label class="art-choice"><input type="radio" name="art-style" value="pixel" ${save.artStyle === 'pixel' ? 'checked' : ''}><span><b>Fine Pixel</b><small>Pixel characters and equipment in our original lush lawns.</small></span></label>
       <label class="art-choice"><input type="radio" name="art-style" value="realism" ${save.artStyle === 'realism' ? 'checked' : ''}><span><b>Textured Realism</b><small>A fully rebuilt world with natural materials and warm summer light.</small></span></label>
       </fieldset><p class="art-status" id="art-status" role="status">Your progress is shared between both styles.</p>
-      <details class="control-details"><summary>Controls</summary><div class="keys"><div><kbd>W A S D</kbd> / arrows</div><div>Move</div><div>Click and hold</div><div>Walk toward the cursor</div><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Space</kbd></div><div>Scatter a handful of fertilizer</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Change equipment at the truck</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
+      <details class="control-details"><summary>Controls</summary><div class="keys"><div><kbd>W A S D</kbd> / arrows</div><div>Move</div><div>Click and hold</div><div>Walk toward the cursor</div><div><kbd>Alt</kbd></div><div>Creep slowly</div><div><kbd>Shift</kbd> / <kbd>L</kbd></div><div>Straight-line lock</div><div><kbd>Space</kbd></div><div>Snip with the trimmer or scatter fertilizer</div><div><kbd>Q</kbd> / <kbd>E</kbd></div><div>Change equipment at the truck</div><div><kbd>+</kbd> <kbd>−</kbd></div><div>Zoom</div><div><kbd>Esc</kbd></div><div>Pause</div></div></details>
       <div class="set-row"><label>Music</label><input type="range" id="s-mus" min="0" max="100" value="${save.music * 100}"></div>
       <div class="set-row"><label>Effects</label><input type="range" id="s-sfx" min="0" max="100" value="${save.sfx * 100}"></div>
+      <div class="set-row"><label for="s-steering">Easy steering</label><input type="checkbox" id="s-steering" ${save.easySteering ? 'checked' : ''}></div><p class="note">Easy steering gives direct turns, instant stops, and gentle line assist. Turn it off for smooth, gradual turning.</p>
       <div class="set-row"><label>Mute all</label><input type="checkbox" id="s-mute" ${save.muted ? 'checked' : ''}></div>
       <div class="row" style="margin-top:14px"><button class="big-btn ghost" id="b-reset">Reset progress</button><span class="grow"></span><button class="big-btn" id="b-ok">Done</button></div></div>`, 'dim');
     let styleRequest = 0;
@@ -389,8 +396,17 @@
     el.querySelector('#s-mus').oninput = (e) => { save.music = e.target.value / 100; applyAudioPrefs(); persist(); };
     el.querySelector('#s-sfx').oninput = (e) => { save.sfx = e.target.value / 100; applyAudioPrefs(); persist(); };
     el.querySelector('#s-sfx').onchange = () => A.coin();
+    el.querySelector('#s-steering').onchange = e => { save.easySteering = e.target.checked; persist(); };
     el.querySelector('#s-mute').onchange = (e) => { save.muted = e.target.checked; applyAudioPrefs(); persist(); };
-    btn(el, '#b-reset', () => { if (confirm('Erase all progress and start over?')) { const keep = { music: save.music, sfx: save.sfx, muted: save.muted, artStyle: save.artStyle }; save = Object.assign(defSave(), keep); persist(); A.error(); back_(); } });
+    btn(el, '#b-reset', () => {
+      if (!confirm('Erase all progress and start over?')) return;
+      const keep = { music: save.music, sfx: save.sfx, muted: save.muted, artStyle: save.artStyle, easySteering: save.easySteering };
+      save = Object.assign(defSave(), keep); persist();
+      // A paused job still references the old save: discard it before leaving Settings.
+      G.s = null; mouse.down = false; spreadQueued = false; touch.active = false;
+      for (const key in keys) keys[key] = false;
+      $('joy-base').style.display = 'none'; A.tool(null, 0, false); A.error(); showBoard();
+    });
     btn(el, '#b-ok', () => { A.click(); back_(); });
   }
 
@@ -424,7 +440,7 @@
     const draw = () => {
       const tools = M.TOOL_ORDER.map((t) => { const T = M.TOOLS[t], own = save.tools[t];
         return `<div class="tool ${sel === t ? 'sel' : ''} ${own ? '' : 'off'}" data-t="${t}">${d.rec === t ? '<span class="rec">Suggested</span>' : ''}<div class="ic">${own ? T.icon : '🔒'}</div><div class="tn">${T.name}</div></div>`; }).join('');
-      const el = show(`<div class="panel"><div class="owner"><div class="face">${d.emoji}</div><div><h2>${d.name}</h2><div class="sub" style="margin:0">Job ${i + 1} · ${d.owner} ${stars(save.stars[i] || 0)}</div></div></div>
+      const el = show(`<div class="panel" data-level="${i}"><div class="owner"><div class="face">${d.emoji}</div><div><h2>${d.name}</h2><div class="sub" style="margin:0">Job ${i + 1} · ${d.owner} ${stars(save.stars[i] || 0)}</div></div></div>
         <div class="quote">${d.quote}</div>
         <div class="facts"><div class="fact">📐 ${Math.round(lv.total)} tufts</div><div class="fact">💵 up to $${d.pay}</div><div class="fact">⏱ par ${fmt(d.par)}</div>
         <div class="fact">🌱 ${M.Groundskeeping.layout(lv).length} rough patches</div>${c('rock') ? `<div class="fact">🪨 ${c('rock')} rocks</div>` : ''}${c('flower') ? `<div class="fact">🌷 ${c('flower')} flowers</div>` : ''}${c('gnome') ? `<div class="fact">🧙 ${c('gnome')} hidden gnomes</div>` : ''}${c('sprinkler') ? `<div class="fact">💦 ${c('sprinkler')} sprinklers</div>` : ''}${(save.stars[i] || 0) > 0 ? '<div class="fact">🔁 repeat job: half pay</div>' : ''}</div>
@@ -469,10 +485,11 @@
     const el = show(`<div class="panel" style="width:min(420px,100%)"><h2>Paused ⏸</h2><p class="sub">Take a breath. The grass isn't going anywhere.</p>
       <div class="set-row"><label>Music</label><input type="range" id="s-mus" min="0" max="100" value="${save.music * 100}"></div>
       <div class="set-row"><label>Effects</label><input type="range" id="s-sfx" min="0" max="100" value="${save.sfx * 100}"></div>
-      <div class="row" style="margin-top:14px;flex-direction:column;align-items:stretch"><button class="big-btn" id="b-res">▶ Resume</button><button class="big-btn ghost" id="b-rs">↺ Restart job</button><button class="big-btn ghost" id="b-q">Quit to jobs</button></div></div>`, 'dim');
+      <div class="row" style="margin-top:14px;flex-direction:column;align-items:stretch"><button class="big-btn" id="b-res">▶ Resume</button><button class="big-btn ghost" id="b-settings">⚙ Settings</button><button class="big-btn ghost" id="b-rs">↺ Restart job</button><button class="big-btn ghost" id="b-q">Quit to jobs</button></div></div>`, 'dim');
     el.querySelector('#s-mus').oninput = (e) => { save.music = e.target.value / 100; applyAudioPrefs(); persist(); };
     el.querySelector('#s-sfx').oninput = (e) => { save.sfx = e.target.value / 100; applyAudioPrefs(); persist(); };
     btn(el, '#b-res', resume);
+    btn(el, '#b-settings', () => showSettings(showPause));
     btn(el, '#b-rs', () => { A.click(); startLevel(G.idx, G.s.tool); });
     btn(el, '#b-q', () => { A.click(); $('hud').classList.add('hidden'); showBoard(); });
   }
@@ -512,8 +529,8 @@
   $('hud-pause').onclick = () => pause();
   $('hud-lock').onclick = () => toggleLock();
   $('hud-tool').onclick = showTruck;
-  $('btn-fertilize').addEventListener('pointerdown', e => { if (G.mode === 'play' && G.s.tool === 'fertilizer') spreadQueued = true; e.preventDefault(); });
-  $('btn-fertilize').onclick = e => { if (e.detail === 0 && G.mode === 'play' && G.s.tool === 'fertilizer') spreadQueued = true; };
+  $('btn-fertilize').addEventListener('pointerdown', e => { if (G.mode === 'play' && ['fertilizer', 'trimmer'].includes(G.s.tool)) spreadQueued = true; e.preventDefault(); });
+  $('btn-fertilize').onclick = e => { if (e.detail === 0 && G.mode === 'play' && ['fertilizer', 'trimmer'].includes(G.s.tool)) spreadQueued = true; };
   $('hud-zoom').onclick = () => setZoom(zoomOff >= 3 ? -3 : zoomOff + 1);
   $('btn-finish').onclick = () => finishJob();
   window.addEventListener('resize', resize);
@@ -536,5 +553,26 @@
   if (DEV && params.has('bench')) { // dev: average ms per frame (update+render), written into the page title
     setTimeout(() => { const t0 = performance.now(); for (let i = 0; i < 60; i++) { update(1 / 60); render(); } document.title = 'bench ' + ((performance.now() - t0) / 60).toFixed(2) + 'ms/frame'; }, 800);
   }
+  M.Feedback.install({
+    snapshot: () => {
+      const demo = G.mode === 'title' || G.mode === 'board', state = demo ? G.demo : G.s;
+      const brief = $('screens').querySelector('[data-level]'), level = brief ? +brief.dataset.level : state?.lv.index;
+      const screen = G.mode === 'title' ? 'Title' : $('screens').querySelector('h2')?.textContent || G.mode;
+      return {
+        gameState: M.Feedback.serializeState(state),
+        progress: structuredClone(save),
+        ui: { mode: G.mode, screen, level, demo, dev: DEV, camera: { ...cam }, zoom: Z, zoomOffset: zoomOff, touch: document.body.classList.contains('touch'), screenText: $('screens').innerText },
+        context: { lawn: M.LEVELS[level]?.name, equipment: state?.ts.def.name, screen, artStyle: save.artStyle, coverage: state ? Sim.coverage(state) : null },
+      };
+    },
+    freeze: active => {
+      feedbackFrozen = active;
+      for (const key in keys) keys[key] = false;
+      mouse.down = false; spreadQueued = false; touch.active = false; touch.id = null;
+      if (!active) $('joy-base').style.display = 'none';
+      if (active) A.tool(null, 0, false);
+    },
+    notify: toast,
+  });
   requestAnimationFrame(frame);
 })();

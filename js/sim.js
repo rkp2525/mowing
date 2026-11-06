@@ -19,7 +19,7 @@
       speed: T.speed * (1 + 0.07 * bo),
       turn: T.turn * (1 + 0.18 * st),
       accel: T.accel, decel: T.decel,
-      width: T.width * (1 + 0.1 * b),
+      width: T.width * (toolId === 'trimmer' ? 1 : 1 + 0.1 * b),
       power: T.power + (b >= 3 ? 1 : 0),
       r: T.r, powered: T.powered, cutDepth: T.cutDepth || .3,
       fuelMax: 100 + [0, 40, 80, 120][tk],
@@ -73,7 +73,7 @@
     s.tool = toolId; s.ts = next;
     s.p.speed = 0;
     s.toolsUsed[toolId] = true;
-    s.sw = null; s.aimPlan = null; s.actWasDown = false;
+    s.sw = null; s.aimPlan = null; s.actWasDown = false; s.trim = toolId === 'trimmer';
     s.fuel = old ? Math.min(s.fuel, s.ts.fuelMax) : s.ts.fuelMax;
     s.stamina = Math.min(s.stamina, s.ts.staminaMax);
     return true;
@@ -139,7 +139,7 @@
     }
     return true;
   }
-  // Retired scythe/trimmer mechanics, kept for future experiments. setTool excludes them.
+  // Retired scythe mechanics, kept for future experiments. The standalone trimmer uses its own narrow cut.
   // Scythe modes. The swing always goes exactly where the player aims (cursor).
   //   sweep: wide arc, full reach, fast over open lawn (will clip flowers / hit rocks)
   //   snip : narrow cone, shorter reach, cheap, for precise work around flowers & rocks
@@ -164,13 +164,15 @@
         return Math.abs(angDiff(a, Math.atan2(dy, dx))) < blade + m * 0.3 && bladeClear(s,x,y,ox,oy);
       };
     }
-    const hx = Math.cos(p.heading), hy = Math.sin(p.heading);
+    if (T.id === 'trimmer' && !s.sw) return null;
+    const origin = T.id === 'trimmer' ? { x: s.sw.ox, y: s.sw.oy, heading: s.sw.a0 } : p;
+    const hx = Math.cos(origin.heading), hy = Math.sin(origin.heading);
     const reach = T.r + 0.35, half = T.width / 2, depth = T.cutDepth;
-    const cx = p.x + hx * reach, cy = p.y + hy * reach;
+    const cx = origin.x + hx * reach, cy = origin.y + hy * reach;
     return (x, y, m) => {
       const dx = x - cx, dy = y - cy;
       const along = dx * hx + dy * hy, side = -dx * hy + dy * hx;
-      return Math.abs(along) <= depth + m && Math.abs(side) <= half + m && bladeClear(s,x,y);
+      return Math.abs(along) <= depth + m && Math.abs(side) <= half + m && bladeClear(s,x,y,origin.x,origin.y);
     };
   }
   function footprintBox(s) {
@@ -195,13 +197,19 @@
 
     const fuelOut = T.powered && s.fuel <= 0;
     // The body always faces travel. Scythe aiming is separate and assisted.
-    const onFoot = T.id === 'scythe' || T.id === 'fertilizer';
+    const onFoot = T.id === 'scythe' || T.id === 'fertilizer' || T.id === 'trimmer';
+    const direct = onFoot || s.save.easySteering !== false;
+    if (!onFoot && direct && ta !== null) {
+      const cardinal = Math.round(ta / (Math.PI / 2)) * Math.PI / 2;
+      const tolerance = (12 + 2 * upgradeLv(s.save, 'steer')) * Math.PI / 180;
+      if (Math.abs(angDiff(ta, cardinal)) <= tolerance) ta = cardinal;
+    }
     if (ta !== null) {
       const d=angDiff(p.heading,ta),maxTurn=T.turn*dt;
-      p.heading=onFoot?ta:p.heading+clamp(d,-maxTurn,maxTurn);
+      p.heading=direct?ta:p.heading+clamp(d,-maxTurn,maxTurn);
     }
     let alignF = 0;
-    if (ta !== null) alignF = onFoot ? 1 : Math.max(T.id === 'ride' ? .45 : .55, Math.cos(angDiff(p.heading, ta)));
+    if (ta !== null) alignF = direct ? 1 : Math.max(T.id === 'ride' ? .45 : .55, Math.cos(angDiff(p.heading, ta)));
     let want = T.speed * mag * alignF;
     if (fuelOut) want *= 0.4;
     if (T.id === 'scythe' && s.tired) want *= 0.55;
@@ -217,7 +225,7 @@
     const a = want > p.speed ? T.accel : T.decel;
     p.speed += clamp(want - p.speed, -a * dt, a * dt);
     if (s.stall > 0) p.speed = Math.min(p.speed, 0.4);
-    if (onFoot && mag <= .1) p.speed = 0; // release means stop; no drift into flowers
+    if (direct && mag <= .1) p.speed = 0; // stop at the stripe endpoint without coasting
 
     // ---- move with axis-separated collision
     const hx = Math.cos(p.heading), hy = Math.sin(p.heading);
@@ -272,6 +280,16 @@
         s.stamina = Math.min(T.staminaMax, s.stamina + T.staminaRegen * dt);
         if (s.tired && s.stamina > T.staminaMax * 0.3) s.tired = false;
       }
+    } else if (T.id === 'trimmer') {
+      s.swCool = Math.max(0, s.swCool - dt);
+      if (pressed && !s.sw && s.swCool <= 0 && s.stall <= 0) {
+        s.sw = { t: 0, dur: .16, a0: p.heading, ox: p.x, oy: p.y, snip: true };
+        ev.push({ e: 'snip' });
+      }
+      if (s.sw) {
+        s.sw.t += dt; cutting = true;
+        if (s.sw.t >= s.sw.dur) { s.sw = null; s.swCool = .12; }
+      }
     } else if (T.id === 'fertilizer') {
       s.spreadCool = Math.max(0, s.spreadCool - dt);
       if (pressed && s.spreadCool <= 0) {
@@ -290,7 +308,7 @@
       cutting = s.stall <= 0 && p.speed > 0.6;
     }
     // scythe grass direction (stripe scoring) follows the swing, not the body's last travel direction
-    if (T.id === 'scythe') dc = dirCode(s.sw ? s.sw.a0 : p.aimHeading);
+    if (T.id === 'scythe' || T.id === 'trimmer') dc = dirCode(s.sw ? s.sw.a0 : p.aimHeading);
     s.cutting = cutting; s.engine = engineOn;
 
     const fp = cutting ? makeFootprint(s) : null;

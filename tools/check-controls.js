@@ -26,6 +26,33 @@ test('Releasing movement brings the mower to rest',()=>{
  const s=lawn();run(s,60,input({mx:1}));run(s,30,input());
  const x=s.p.x,y=s.p.y;run(s,30,input());assert.equal(s.p.x,x);assert.equal(s.p.y,y);assert.equal(s.p.speed,0);
 });
+test('Every mower makes an immediate right-angle turn without drifting along the old direction',()=>{
+ for(const tool of M.TOOL_ORDER)for(const step of [1/30,1/60,1/120]){
+  const s=lawn(tool);s.p.heading=-Math.PI/2;
+  for(let i=0;i<30;i++)M.Sim.step(s,input({my:-1}),step);
+  const x=s.p.x,y=s.p.y;
+  M.Sim.step(s,input({mx:1}),step);
+  assert.ok(s.p.x>x,tool+' should move right immediately');
+  assert.equal(s.p.y,y,tool+' should not keep moving vertically during a right turn');
+  assert.equal(s.p.heading,0);
+ }
+});
+test('Releasing a mower stops at the stripe endpoint immediately',()=>{
+ for(const tool of M.TOOL_ORDER){
+  const s=lawn(tool);run(s,120,input({mx:1}));const x=s.p.x,y=s.p.y;
+  run(s,1,input());assert.equal(s.p.x,x);assert.equal(s.p.y,y);assert.equal(s.p.speed,0);
+ }
+});
+test('Line assist straightens small deviations while allowing deliberate diagonals',()=>{
+ for(const tool of M.TOOL_ORDER){
+  const s=lawn(tool);run(s,60,input({mx:1,my:.08}));assert.equal(s.p.y,15.5);assert.equal(s.p.heading,0);
+  const x=s.p.x,y=s.p.y;run(s,10,input({mx:1,my:1}));assert.ok(s.p.x>x&&s.p.y>y);assert.equal(s.p.heading,Math.PI/4);
+ }
+});
+test('Smooth turning remains available when easy steering is disabled',()=>{
+ const s=lawn();s.save.easySteering=false;s.p.heading=Math.PI/2;run(s,30,input({my:1}));const y=s.p.y;
+ run(s,1,input({mx:1}));assert.ok(s.p.y>y);assert.ok(s.p.heading>0);
+});
 test('Push mower cuts only its physical width at sub-cell precision',()=>{
  for(const tool of ['reel','gas']){
   const s=lawn(tool);s.p.heading=0;run(s,60,input({mx:1}));const half=s.ts.width/2;
